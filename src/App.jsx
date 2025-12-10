@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
+import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
 import { getFirestore, doc, setDoc, onSnapshot } from 'firebase/firestore';
 import { 
   BookOpen, 
@@ -1716,94 +1716,146 @@ const VocabBrowser = ({ onBack, vocabList, onUpdateItem, onAddItem, onDeleteItem
 };
 
 // --- DASHBOARD (Strictly Defined Before App) ---
-const Dashboard = ({ vocabList, onStartMode, resetProgress, onOpenVocab }) => {
-    const stats = {
-        new: vocabList.filter(i => i.status === STATUS.NEW && !i.isDeleted).length,
-        learning: vocabList.filter(i => i.status === STATUS.LEARNING && !i.isDeleted).length,
-        review: vocabList.filter(i => i.status === STATUS.REVIEW && !i.isDeleted).length,
-        drifting: vocabList.filter(i => i.status === STATUS.DRIFTING && !i.isDeleted).length,
-        mastered: vocabList.filter(i => i.status === STATUS.MASTERED && !i.isDeleted).length,
-        nigate: vocabList.filter(i => i.isNigate && !i.isDeleted).length
-    };
+// --- DASHBOARD (修改版：加入 Google 登入) ---
+const Dashboard = ({ vocabList, onStartMode, resetProgress, onOpenVocab, user }) => { // 注意這裡多收了 user
+  const stats = {
+      new: vocabList.filter(i => i.status === STATUS.NEW && !i.isDeleted).length,
+      learning: vocabList.filter(i => i.status === STATUS.LEARNING && !i.isDeleted).length,
+      review: vocabList.filter(i => i.status === STATUS.REVIEW && !i.isDeleted).length,
+      drifting: vocabList.filter(i => i.status === STATUS.DRIFTING && !i.isDeleted).length,
+      mastered: vocabList.filter(i => i.status === STATUS.MASTERED && !i.isDeleted).length,
+      nigate: vocabList.filter(i => i.isNigate && !i.isDeleted).length
+  };
 
-    return (
-        <div className="flex flex-col h-full bg-slate-50">
-            <div className="bg-indigo-700 p-8 pb-12 rounded-b-[2.5rem] shadow-xl text-white relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-4 opacity-10"><Languages className="w-32 h-32" /></div>
-                <div className="flex justify-between items-start relative z-10">
-                    <div>
-                        <h1 className="text-3xl font-extrabold mb-2 tracking-tight">Duanlingo</h1>
-                        <p className="text-indigo-200 text-sm">Ultimate Edition</p>
-                    </div>
-                    {/* Trash icon removed as requested */}
-                </div>
-                <div className="mt-8 grid grid-cols-3 gap-2 relative z-10">
-                    <button onClick={() => onOpenVocab(`status-${STATUS.NEW}`)} className="bg-white/10 backdrop-blur-md p-2 rounded-xl text-center hover:bg-white/20 transition-colors"><div className="flex justify-center mb-1 text-indigo-200"><CircleDashed className="w-4 h-4"/></div><span className="block text-xl font-bold">{stats.new}</span><span className="text-[10px] uppercase tracking-wider opacity-70">New</span></button>
-                    <button onClick={() => onOpenVocab(`status-${STATUS.LEARNING}`)} className="bg-white/10 backdrop-blur-md p-2 rounded-xl text-center border border-indigo-400 hover:bg-white/20 transition-colors"><div className="flex justify-center mb-1 text-white"><BookOpen className="w-4 h-4"/></div><span className="block text-xl font-bold">{stats.learning}</span><span className="text-[10px] uppercase tracking-wider opacity-70">Learning</span></button>
-                    <button onClick={() => onOpenVocab(`status-${STATUS.REVIEW}`)} className="bg-white/10 backdrop-blur-md p-2 rounded-xl text-center hover:bg-white/20 transition-colors"><div className="flex justify-center mb-1 text-green-300"><CheckCircle className="w-4 h-4"/></div><span className="block text-xl font-bold">{stats.review}</span><span className="text-[10px] uppercase tracking-wider opacity-70">Short Term</span></button>
-                    <button onClick={() => onOpenVocab(`status-${STATUS.DRIFTING}`)} className="bg-white/10 backdrop-blur-md p-2 rounded-xl text-center hover:bg-white/20 transition-colors"><div className="flex justify-center mb-1 text-orange-300"><TrendingDown className="w-4 h-4"/></div><span className="block text-xl font-bold">{stats.drifting}</span><span className="text-[10px] uppercase tracking-wider opacity-70">Drifting</span></button>
-                    <button onClick={() => onOpenVocab(`status-${STATUS.MASTERED}`)} className="bg-white/10 backdrop-blur-md p-2 rounded-xl text-center hover:bg-white/20 transition-colors"><div className="flex justify-center mb-1 text-yellow-300"><Trophy className="w-4 h-4"/></div><span className="block text-xl font-bold">{stats.mastered}</span><span className="text-[10px] uppercase tracking-wider opacity-70">Mastered</span></button>
-                    <button onClick={() => onOpenVocab('nigate')} className="bg-red-500/20 backdrop-blur-md p-2 rounded-xl text-center border border-red-500/30 hover:bg-red-500/30 transition-colors"><div className="flex justify-center mb-1 text-red-300"><Skull className="w-4 h-4"/></div><span className="block text-xl font-bold">{stats.nigate}</span><span className="text-[10px] uppercase tracking-wider opacity-70">Nigate</span></button>
-                </div>
-            </div>
-            <div className="flex-1 p-6 -mt-4 overflow-y-auto space-y-4">
-                <div className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">Core Path</div>
-                <button onClick={() => onStartMode('learning')} disabled={stats.new + stats.learning === 0} className="w-full bg-white p-5 rounded-2xl shadow-sm hover:shadow-md transition-all border border-slate-100 flex items-center gap-4 disabled:opacity-50">
-                    <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center"><BookOpen className="w-5 h-5 text-indigo-600" /></div>
-                    <div className="text-left flex-1"><h3 className="font-bold text-slate-800">Learning Mode</h3><p className="text-slate-500 text-xs">Learn new words & promote</p></div>
-                    <ArrowRight className="text-slate-300 w-5 h-5" />
-                </button>
-                <button onClick={() => onStartMode('review')} disabled={stats.drifting === 0} className="w-full bg-white p-5 rounded-2xl shadow-sm hover:shadow-md transition-all border border-slate-100 flex items-center gap-4 disabled:opacity-50">
-                    <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center"><RotateCcw className="w-5 h-5 text-orange-600" /></div>
-                    <div className="text-left flex-1"><h3 className="font-bold text-slate-800">Review Mode</h3><p className="text-slate-500 text-xs">Recover drifting words</p></div>
-                    <ArrowRight className="text-slate-300 w-5 h-5" />
-                </button>
-                {stats.nigate > 0 && (
-                    <button onClick={() => onStartMode('hell')} className="w-full bg-gradient-to-r from-red-50 to-red-100 p-5 rounded-2xl shadow-sm hover:shadow-md transition-all border border-red-200 flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-full bg-red-200 flex items-center justify-center"><Flame className="w-6 h-6 text-red-600 animate-pulse" /></div>
-                        <div className="text-left flex-1"><h3 className="font-bold text-red-800">Hell Training</h3><p className="text-red-600 text-xs">Clear NIGATE status</p></div>
-                        <ArrowRight className="text-red-300 w-5 h-5" />
-                    </button>
-                )}
-                <div className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1 mt-6">Arcade & Tools</div>
-                <div className="grid grid-cols-2 gap-3">
-                    <button onClick={() => onStartMode('arcade-blitz')} className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 hover:border-indigo-200 flex flex-col items-center gap-2">
-                        <Clock className="w-6 h-6 text-blue-500" />
-                        <span className="font-bold text-slate-700 text-sm">Blitz</span>
-                    </button>
-                    
-                    {/* NEW GAME: REVERSE BLITZ */}
-                    <button onClick={() => onStartMode('arcade-reverse-blitz')} className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 hover:border-indigo-200 flex flex-col items-center gap-2">
-                        <Shuffle className="w-6 h-6 text-pink-500" />
-                        <span className="font-bold text-slate-700 text-sm">Rev. Blitz</span>
-                    </button>
+  const handleGoogleLogin = async () => {
+      const auth = getAuth();
+      const provider = new GoogleAuthProvider();
+      try {
+          // 這會跳出 Google 登入視窗
+          await signInWithPopup(auth, provider);
+          // 登入成功後，React 會自動偵測到 user 改變，並重新載入雲端進度
+      } catch (error) {
+          console.error("Login failed", error);
+          alert("Login failed: " + error.message);
+      }
+  };
 
-                    {/* NEW GAME: LISTENING */}
-                    <button onClick={() => onStartMode('arcade-listening')} className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 hover:border-indigo-200 flex flex-col items-center gap-2">
-                        <Headphones className="w-6 h-6 text-red-500" />
-                        <span className="font-bold text-slate-700 text-sm">Listening</span>
-                    </button>
+  const handleLogout = () => {
+      const auth = getAuth();
+      signOut(auth).then(() => {
+           // 登出後重新載入頁面，回到匿名狀態
+           window.location.reload();
+      });
+  };
 
-                    <button onClick={() => onStartMode('arcade-memory')} className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 hover:border-indigo-200 flex flex-col items-center gap-2">
-                        <Grid2X2 className="w-6 h-6 text-purple-500" />
-                        <span className="font-bold text-slate-700 text-sm">Memory</span>
-                    </button>
-                    <button onClick={() => onStartMode('arcade-sentence')} className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 hover:border-indigo-200 flex flex-col items-center gap-2">
-                        <Brain className="w-6 h-6 text-orange-500" />
-                        <span className="font-bold text-slate-700 text-sm">Sentence</span>
-                    </button>
-                    <button onClick={() => onStartMode('arcade-spelling')} className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 hover:border-indigo-200 flex flex-col items-center gap-2">
-                        <Keyboard className="w-6 h-6 text-teal-500" />
-                        <span className="font-bold text-slate-700 text-sm">Spelling</span>
-                    </button>
-                    <button onClick={() => onStartMode('vocab')} className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 hover:border-indigo-200 flex flex-col items-center gap-2 col-span-2">
-                        <ListChecks className="w-6 h-6 text-emerald-500" />
-                        <span className="font-bold text-slate-700 text-sm">Vocabulary Manager</span>
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
+  return (
+      <div className="flex flex-col h-full bg-slate-50">
+          <div className="bg-indigo-700 p-8 pb-12 rounded-b-[2.5rem] shadow-xl text-white relative overflow-hidden">
+              <div className="absolute top-0 right-0 p-4 opacity-10"><Languages className="w-32 h-32" /></div>
+              
+              {/* 頂部導覽列：加入登入/登出按鈕 */}
+              <div className="flex justify-between items-start relative z-10 mb-6">
+                  <div>
+                      <h1 className="text-3xl font-extrabold mb-2 tracking-tight">Duanlingo</h1>
+                      <p className="text-indigo-200 text-sm">Ultimate Edition</p>
+                  </div>
+                  <div>
+                      {user && !user.isAnonymous ? (
+                          <div className="flex items-center gap-2">
+                              <img 
+                                src={`https://api.dicebear.com/9.x/adventurer/svg?seed=${user.uid}`}
+                                alt="User Avatar"
+                                className="w-10 h-10 rounded-full border-2 border-white shadow-sm bg-indigo-100" 
+                              />
+                              <button onClick={handleLogout} className="bg-indigo-800 hover:bg-indigo-900 text-xs px-3 py-1.5 rounded-full font-bold transition-colors">
+                                  Sign Out
+                              </button>
+                          </div>
+                      ) : (
+                          <button onClick={handleGoogleLogin} className="bg-white text-indigo-700 hover:bg-indigo-50 text-xs px-4 py-2 rounded-full font-bold shadow-md transition-colors flex items-center gap-2">
+                              <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
+                              Login to Save
+                          </button>
+                      )}
+                  </div>
+              </div>
+
+              <div className="mt-4 grid grid-cols-3 gap-2 relative z-10">
+                  <button onClick={() => onOpenVocab(`status-${STATUS.NEW}`)} className="bg-white/10 backdrop-blur-md p-2 rounded-xl text-center hover:bg-white/20 transition-colors"><div className="flex justify-center mb-1 text-indigo-200"><CircleDashed className="w-4 h-4"/></div><span className="block text-xl font-bold">{stats.new}</span><span className="text-[10px] uppercase tracking-wider opacity-70">New</span></button>
+                  <button onClick={() => onOpenVocab(`status-${STATUS.LEARNING}`)} className="bg-white/10 backdrop-blur-md p-2 rounded-xl text-center border border-indigo-400 hover:bg-white/20 transition-colors"><div className="flex justify-center mb-1 text-white"><BookOpen className="w-4 h-4"/></div><span className="block text-xl font-bold">{stats.learning}</span><span className="text-[10px] uppercase tracking-wider opacity-70">Learning</span></button>
+                  <button onClick={() => onOpenVocab(`status-${STATUS.REVIEW}`)} className="bg-white/10 backdrop-blur-md p-2 rounded-xl text-center hover:bg-white/20 transition-colors"><div className="flex justify-center mb-1 text-green-300"><CheckCircle className="w-4 h-4"/></div><span className="block text-xl font-bold">{stats.review}</span><span className="text-[10px] uppercase tracking-wider opacity-70">Short Term</span></button>
+                  <button onClick={() => onOpenVocab(`status-${STATUS.DRIFTING}`)} className="bg-white/10 backdrop-blur-md p-2 rounded-xl text-center hover:bg-white/20 transition-colors"><div className="flex justify-center mb-1 text-orange-300"><TrendingDown className="w-4 h-4"/></div><span className="block text-xl font-bold">{stats.drifting}</span><span className="text-[10px] uppercase tracking-wider opacity-70">Drifting</span></button>
+                  <button onClick={() => onOpenVocab(`status-${STATUS.MASTERED}`)} className="bg-white/10 backdrop-blur-md p-2 rounded-xl text-center hover:bg-white/20 transition-colors"><div className="flex justify-center mb-1 text-yellow-300"><Trophy className="w-4 h-4"/></div><span className="block text-xl font-bold">{stats.mastered}</span><span className="text-[10px] uppercase tracking-wider opacity-70">Mastered</span></button>
+                  <button onClick={() => onOpenVocab('nigate')} className="bg-red-500/20 backdrop-blur-md p-2 rounded-xl text-center border border-red-500/30 hover:bg-red-500/30 transition-colors"><div className="flex justify-center mb-1 text-red-300"><Skull className="w-4 h-4"/></div><span className="block text-xl font-bold">{stats.nigate}</span><span className="text-[10px] uppercase tracking-wider opacity-70">Nigate</span></button>
+              </div>
+          </div>
+          
+          <div className="flex-1 p-6 -mt-4 overflow-y-auto space-y-4">
+              <div className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">Core Path</div>
+              <button onClick={() => onStartMode('learning')} disabled={stats.new + stats.learning === 0} className="w-full bg-white p-5 rounded-2xl shadow-sm hover:shadow-md transition-all border border-slate-100 flex items-center gap-4 disabled:opacity-50">
+                  <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center"><BookOpen className="w-5 h-5 text-indigo-600" /></div>
+                  <div className="text-left flex-1"><h3 className="font-bold text-slate-800">Learning Mode</h3><p className="text-slate-500 text-xs">Learn new words & promote</p></div>
+                  <ArrowRight className="text-slate-300 w-5 h-5" />
+              </button>
+              <button onClick={() => onStartMode('review')} disabled={stats.drifting === 0} className="w-full bg-white p-5 rounded-2xl shadow-sm hover:shadow-md transition-all border border-slate-100 flex items-center gap-4 disabled:opacity-50">
+                  <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center"><RotateCcw className="w-5 h-5 text-orange-600" /></div>
+                  <div className="text-left flex-1"><h3 className="font-bold text-slate-800">Review Mode</h3><p className="text-slate-500 text-xs">Recover drifting words</p></div>
+                  <ArrowRight className="text-slate-300 w-5 h-5" />
+              </button>
+              {stats.nigate > 0 && (
+                  <button onClick={() => onStartMode('hell')} className="w-full bg-gradient-to-r from-red-50 to-red-100 p-5 rounded-2xl shadow-sm hover:shadow-md transition-all border border-red-200 flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-full bg-red-200 flex items-center justify-center"><Flame className="w-6 h-6 text-red-600 animate-pulse" /></div>
+                      <div className="text-left flex-1"><h3 className="font-bold text-red-800">Hell Training</h3><p className="text-red-600 text-xs">Clear NIGATE status</p></div>
+                      <ArrowRight className="text-red-300 w-5 h-5" />
+                  </button>
+              )}
+              <div className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1 mt-6">Arcade & Tools</div>
+              <div className="grid grid-cols-2 gap-3">
+                  <button onClick={() => onStartMode('arcade-blitz')} className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 hover:border-indigo-200 flex flex-col items-center gap-2">
+                      <Clock className="w-6 h-6 text-blue-500" />
+                      <span className="font-bold text-slate-700 text-sm">Blitz</span>
+                  </button>
+                  <button onClick={() => onStartMode('arcade-reverse-blitz')} className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 hover:border-indigo-200 flex flex-col items-center gap-2">
+                      <Shuffle className="w-6 h-6 text-pink-500" />
+                      <span className="font-bold text-slate-700 text-sm">Rev. Blitz</span>
+                  </button>
+                  <button onClick={() => onStartMode('arcade-listening')} className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 hover:border-indigo-200 flex flex-col items-center gap-2">
+                      <Headphones className="w-6 h-6 text-red-500" />
+                      <span className="font-bold text-slate-700 text-sm">Listening</span>
+                  </button>
+                  <button onClick={() => onStartMode('arcade-memory')} className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 hover:border-indigo-200 flex flex-col items-center gap-2">
+                      <Grid2X2 className="w-6 h-6 text-purple-500" />
+                      <span className="font-bold text-slate-700 text-sm">Memory</span>
+                  </button>
+                  <button onClick={() => onStartMode('arcade-sentence')} className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 hover:border-indigo-200 flex flex-col items-center gap-2">
+                      <Brain className="w-6 h-6 text-orange-500" />
+                      <span className="font-bold text-slate-700 text-sm">Sentence</span>
+                  </button>
+                  <button onClick={() => onStartMode('arcade-spelling')} className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 hover:border-indigo-200 flex flex-col items-center gap-2">
+                      <Keyboard className="w-6 h-6 text-teal-500" />
+                      <span className="font-bold text-slate-700 text-sm">Spelling</span>
+                  </button>
+                  <button onClick={() => onStartMode('vocab')} className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 hover:border-indigo-200 flex flex-col items-center gap-2 col-span-2">
+                      <ListChecks className="w-6 h-6 text-emerald-500" />
+                      <span className="font-bold text-slate-700 text-sm">Vocabulary Manager</span>
+                  </button>
+              </div>
+              
+              {/* 顯示目前登入狀態提示 */}
+              <div className="text-center mt-4">
+                   {user && !user.isAnonymous ? (
+                      <p className="text-xs text-green-600 font-bold bg-green-50 inline-block px-3 py-1 rounded-full border border-green-200">
+                         Cloud Sync Active • {user.email}
+                      </p>
+                   ) : (
+                      <p className="text-xs text-slate-400 italic">
+                         Login to save your progress permanently
+                      </p>
+                   )}
+              </div>
+          </div>
+      </div>
+  );
 };
 
 // --- APP ROOT ---
@@ -1955,10 +2007,11 @@ const App = () => {
       <div className="w-full max-w-md h-full md:h-[90vh] bg-white md:rounded-[2rem] overflow-hidden shadow-2xl relative">
           {view === 'home' && (
               <Dashboard 
-                vocabList={vocabList} 
-                onStartMode={setView} 
-                resetProgress={handleHardReset} 
-                onOpenVocab={handleOpenVocab}
+              vocabList={vocabList} 
+              onStartMode={setView} 
+              resetProgress={handleHardReset} 
+              onOpenVocab={handleOpenVocab}
+              user={user} 
               />
           )}
           {(view === 'learning' || view === 'review' || view === 'hell') && (
