@@ -2082,17 +2082,17 @@ const App = () => {
   // 邏輯解釋：只要 (資料還在載) 或者 (影片還沒播完)，就顯示開場畫面
   if (loading || !isVideoDone) {
     return (
-      <div className="fixed inset-0 z-50 bg-black">
+      // 1. 背景設為黑色 (bg-black)，這樣影片的邊界就會跟背景融合
+      <div className="fixed inset-0 z-50 bg-black flex items-center justify-center">
         
-        {/* 只留下影片，其他雜訊全部移除 */}
         <video
           autoPlay
           muted
           playsInline
-          // 關鍵：影片播完時，發出訊號
           onEnded={() => setIsVideoDone(true)} 
-          // 樣式：滿版 (object-cover)、無透明度 (呈現原色)
-          className="absolute inset-0 w-full h-full object-cover"
+          // 2. [關鍵修改] 改成 object-contain
+          // 意思：保持 1:1 比例，完整顯示在螢幕內，不要裁切
+          className="absolute inset-0 w-full h-full object-contain"
         >
           <source src="/loading.mp4" type="video/mp4" />
         </video>
