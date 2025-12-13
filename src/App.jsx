@@ -1859,6 +1859,7 @@ const Dashboard = ({ vocabList, onStartMode, resetProgress, onOpenVocab, user })
 };
 
 // --- APP ROOT ---
+// --- APP ROOT (REPLACE THIS ENTIRE COMPONENT) ---
 const App = () => {
   const [view, setView] = useState('home'); 
   const [vocabList, setVocabList] = useState([]);
@@ -1867,44 +1868,57 @@ const App = () => {
   const [user, setUser] = useState(null);
   const [authReady, setAuthReady] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false); // [修改點 1] 新增儲存狀態
 
+  // [修改點 2] 使用 Ref 隨時備份當前的進度，用於切換帳號時的數據遷移
+  const vocabListRef = useRef([]); 
+  useEffect(() => { vocabListRef.current = vocabList; }, [vocabList]);
+
+  // 初始化 Firebase Auth
   useEffect(() => {
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const firestore = getFirestore(app);
     setDb(firestore);
   
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        // log in google
-        setUser(user);
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      if (currentUser) {
+        setUser(currentUser);
         setAuthReady(true);
       } else {
-        // No log in, use anonymous
         await signInAnonymously(auth);
       }
     });
   
     return unsubscribe;
   }, []);
-  
 
+  // [修改點 3] 核心資料同步邏輯 (包含遷移與讀取)
+  // [修改點 3] 核心資料同步邏輯 (修正版：已移除無限迴圈)
   useEffect(() => {
     if (!authReady || !db || !user) return;
     setLoading(true);
-    const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'data', 'vocab_ultimate_v6'); 
+    
+    // 指向使用者的雲端資料庫路徑
+    const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'data', 'vocab_ultimate_v7_test'); 
+    
     const unsubscribe = onSnapshot(docRef, (docSnap) => {
+      // 這裡我們只負責「讀取」並更新畫面，絕對不執行 saveToCloud，避免無窮迴圈
+      
       if (docSnap.exists()) {
+        // --- 情況 A：雲端有資料 ---
+        console.log("Cloud update received");
         const savedData = docSnap.data().list;
         let merged = [];
+        
         if (Array.isArray(savedData)) {
             merged = FULL_VOCAB_DATA.map(staticItem => {
                 const savedItem = savedData.find(s => s.id === staticItem.id);
                 if (savedItem) {
                     if (savedItem.isCustomized) return normalizeVocabItem(savedItem);
-                    // IMPORTANT: Merge savedItem state so 'isDeleted' is preserved
                     return {
                         ...staticItem, 
+                        // 展開所有已存欄位
                         familiarity: savedItem.familiarity,
                         status: savedItem.status,
                         learningProgress: savedItem.learningProgress,
@@ -1926,39 +1940,68 @@ const App = () => {
         } else {
              merged = FULL_VOCAB_DATA.map(normalizeVocabItem);
         }
+
+        // 處理遺忘機制 (Drifting) - 只更新本地狀態，不立即寫回雲端
         const now = Date.now();
         const oneDay = 24 * 60 * 60 * 1000;
-        let hasChanges = false;
         const processed = merged.map(item => {
             const timeDiff = now - (item.lastReviewed || now);
+            let newItem = item;
+            
+            // 如果很久沒複習，本地顯示為 Drifting，但在使用者玩遊戲存檔前，先不寫回資料庫
             if (item.status === STATUS.REVIEW && timeDiff > oneDay) {
-                hasChanges = true;
-                return { ...item, status: STATUS.DRIFTING, reviewProgress: { spelling: 0, select: 0 } };
+                newItem = { ...item, status: STATUS.DRIFTING, reviewProgress: { spelling: 0, select: 0 } };
             }
             if (item.status === STATUS.MASTERED && timeDiff > (oneDay * 3)) {
-                hasChanges = true;
-                return { ...item, status: STATUS.DRIFTING, reviewProgress: { spelling: 0, select: 0 } };
+                newItem = { ...item, status: STATUS.DRIFTING, reviewProgress: { spelling: 0, select: 0 } };
             }
-            return item;
+            return newItem;
         });
+
         setVocabList(processed);
-        if (hasChanges) saveToCloud(processed); 
+        // [重要修改] 這裡移除了 saveToCloud(processed)，切斷了迴圈。
+        // 資料會在使用者下次玩遊戲時自然被保存。
+
       } else {
-        const initList = FULL_VOCAB_DATA.map(normalizeVocabItem);
-        setVocabList(initList);
-        saveToCloud(initList);
+        // --- 情況 B：雲端無資料 (新帳號/遷移) ---
+        
+        // 檢查 Ref 裡面有沒有剛才玩過的匿名進度
+        const currentLocalData = vocabListRef.current;
+        // 嚴格檢查：必須真的有玩過 (familiarity > 0) 才算有進度
+        const hasLocalProgress = currentLocalData && currentLocalData.length > 0 && currentLocalData.some(i => (i.familiarity > 0 || i.status > 0) && !i.isDeleted);
+
+        if (hasLocalProgress) {
+            // [關鍵] 智慧遷移：把匿名進度上傳到這個新帳號
+            console.log("Migrating local progress to new cloud account...");
+            // 這裡可以呼叫 saveToCloud，因為這只會發生一次 (存完後 docSnap.exists 就會變成 true)
+            saveToCloud(currentLocalData);
+            // 畫面保持不變，直接使用本地資料
+            setVocabList(currentLocalData);
+        } else {
+            // 如果連本地也是空的，那就初始化
+            console.log("Initializing fresh data");
+            const initList = FULL_VOCAB_DATA.map(normalizeVocabItem);
+            setVocabList(initList);
+            saveToCloud(initList);
+        }
       }
       setLoading(false);
     });
     return () => unsubscribe();
   }, [authReady, db, user]);
 
+  // [修改點 4] 儲存函式增加錯誤處理與 UI 狀態
   const saveToCloud = async (newList) => {
     if (!db || !user) return;
+    setIsSaving(true);
     try {
-      const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'data', 'vocab_ultimate_v6');
+      const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'data', 'vocab_ultimate_v7_test');
       await setDoc(docRef, { list: newList, lastUpdated: new Date().toISOString() });
-    } catch (e) { console.error("Save failed", e); }
+      setTimeout(() => setIsSaving(false), 500);
+    } catch (e) { 
+        console.error("Save failed", e); 
+        setIsSaving(false);
+    }
   };
 
   const handleUpdateItem = (updatedItem) => {
@@ -1971,7 +2014,6 @@ const App = () => {
 
   const handleDeleteItem = (id) => {
       setVocabList(prev => {
-          // FIX: Mark as deleted instead of removing from array to prevent resurrection during sync
           const newList = prev.map(i => i.id === id ? { ...i, isDeleted: true } : i);
           saveToCloud(newList);
           return newList;
@@ -1998,11 +2040,19 @@ const App = () => {
 
   const handleOpenVocab = (filter) => { setVocabFilter(filter); setView('vocab'); };
 
-  if (loading) return <div className="h-screen w-full flex items-center justify-center text-indigo-600"><Loader2 className="w-8 h-8 animate-spin"/></div>;
+  if (loading) return <div className="h-screen w-full flex items-center justify-center text-indigo-600 flex-col gap-4"><Loader2 className="w-8 h-8 animate-spin"/><p className="text-sm font-bold animate-pulse">Syncing Cloud Data...</p></div>;
 
   return (
     <div className="h-screen w-full bg-slate-200 flex items-center justify-center font-sans">
       <div className="w-full max-w-md h-full md:h-[90vh] bg-white md:rounded-[2rem] overflow-hidden shadow-2xl relative">
+          
+          {/* [修改點 5] 畫面右上角顯示儲存中動畫 */}
+          {isSaving && (
+              <div className="absolute top-4 right-4 z-50 bg-white/80 backdrop-blur text-indigo-600 text-xs font-bold px-3 py-1 rounded-full shadow-sm flex items-center gap-2 border border-indigo-100 animate-in fade-in slide-in-from-top-2">
+                  <Loader2 className="w-3 h-3 animate-spin" /> Saving...
+              </div>
+          )}
+
           {view === 'home' && (
               <Dashboard 
               vocabList={vocabList} 
