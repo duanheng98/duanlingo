@@ -1869,27 +1869,25 @@ const App = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    let unsubscribeAuth = () => {};
-    try {
-      const app = initializeApp(firebaseConfig);
-      const auth = getAuth(app);
-      const firestore = getFirestore(app);
-      setDb(firestore);
-      const authenticate = async () => {
-        if (initialAuthToken) await withRetry(() => signInWithCustomToken(auth, initialAuthToken));
-        else await withRetry(() => signInAnonymously(auth));
-      };
-      unsubscribeAuth = onAuthStateChanged(auth, (user) => {
-        if (user) { setUser(user); setAuthReady(true); }
-      });
-      authenticate();
-    } catch (e) {
-      console.error("Firebase Auth Error", e);
-      setVocabList(FULL_VOCAB_DATA.map(normalizeVocabItem));
-      setLoading(false);
-    }
-    return () => unsubscribeAuth();
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const firestore = getFirestore(app);
+    setDb(firestore);
+  
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        // log in google
+        setUser(user);
+        setAuthReady(true);
+      } else {
+        // No log in, use anonymous
+        await signInAnonymously(auth);
+      }
+    });
+  
+    return unsubscribe;
   }, []);
+  
 
   useEffect(() => {
     if (!authReady || !db || !user) return;
