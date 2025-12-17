@@ -417,6 +417,106 @@ const SentenceFillGame = ({ card, options, onAnswer, feedbackState, selectedOpti
   );
 };
 
+// [新增] 專門給 Learning/Review Session 用的句子重組遊戲
+const SessionSentenceBuilder = ({ card, onAnswer, feedbackState }) => {
+  const [scrambledWords, setScrambledWords] = useState([]);
+  const [selectedWords, setSelectedWords] = useState([]);
+  
+  // 初始化：將例句拆解並打亂
+  useEffect(() => {
+    // 簡單的防呆：確保有例句
+    const sentence = card.example || card.german; 
+    const words = sentence.split(' ').map((text, id) => ({ id, text }));
+    setScrambledWords(shuffleArray(words));
+    setSelectedWords([]);
+  }, [card]);
+
+  // 點擊下方單字庫 -> 移到上方
+  const handleWordClick = (word) => {
+    if (feedbackState) return; // 結算後鎖定
+    setScrambledWords(prev => prev.filter(w => w.id !== word.id));
+    setSelectedWords(prev => [...prev, word]);
+  };
+
+  // 點擊上方已選單字 -> 移回下方
+  const handleUndo = (word) => {
+    if (feedbackState) return; // 結算後鎖定
+    setSelectedWords(prev => prev.filter(w => w.id !== word.id));
+    setScrambledWords(prev => [...prev, word]);
+  };
+
+  // 送出答案
+  const check = () => {
+    const currentString = selectedWords.map(w => w.text).join(' ');
+    // 寬容度處理：去除標點符號後比對，或者直接嚴格比對
+    // 這裡採用嚴格比對，但去除了頭尾空白
+    const isCorrect = currentString.trim() === card.example.trim();
+    
+    // 呼叫 SessionController 的標準回答介面 (null 代表沒有特定選項ID)
+    onAnswer(null, isCorrect);
+  };
+
+  // 根據狀態決定邊框顏色
+  let containerClass = "border-slate-300 bg-slate-100";
+  if (feedbackState === 'correct') containerClass = "border-green-500 bg-green-50";
+  if (feedbackState === 'wrong') containerClass = "border-red-500 bg-red-50";
+
+  return (
+    <div className="flex flex-col items-center w-full animate-in fade-in slide-in-from-bottom-4 duration-300">
+      <div className="text-sm uppercase text-orange-500 font-bold mb-4 tracking-wider">Build the Sentence</div>
+      
+      {/* 題目：英文意思 */}
+      <div className="text-xl text-center text-slate-700 font-medium mb-2 leading-relaxed max-w-lg bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+         {card.english}
+      </div>
+      
+      {/* 提示：目標單字 (怕使用者不知道要造哪個句) */}
+      <div className="text-xs text-slate-400 mb-6">
+         Target word: <span className="font-bold text-indigo-500">{card.german}</span>
+      </div>
+
+      {/* 答題區 (上方) */}
+      <div className={`w-full max-w-md min-h-[80px] rounded-xl p-4 mb-4 flex flex-wrap gap-2 content-start transition-all border-2 ${containerClass}`}>
+        {selectedWords.length === 0 && !feedbackState && (
+            <span className="text-slate-400 w-full text-center text-sm select-none py-2">Tap words below</span>
+        )}
+        {selectedWords.map(word => (
+          <button key={word.id} onClick={() => handleUndo(word)} className="bg-white px-3 py-1.5 rounded-lg shadow-sm text-slate-800 font-bold text-sm animate-in zoom-in duration-200">
+            {word.text}
+          </button>
+        ))}
+      </div>
+
+      {/* 選項區 (下方) - 只有在還沒答題或答錯時顯示，答對隱藏以保持整潔 */}
+      <div className="flex flex-wrap gap-2 justify-center w-full max-w-md mb-8 min-h-[60px]">
+        {scrambledWords.map(word => (
+          <button key={word.id} onClick={() => handleWordClick(word)} disabled={feedbackState} className="bg-indigo-100 text-indigo-900 px-3 py-1.5 rounded-lg font-medium hover:bg-indigo-200 active:scale-95 transition-all disabled:opacity-50">
+            {word.text}
+          </button>
+        ))}
+      </div>
+
+      {/* 錯誤時顯示正確答案 */}
+      {feedbackState === 'wrong' && (
+          <div className="text-red-500 font-bold mb-4 animate-in fade-in text-center">
+              Correct: {card.example}
+          </div>
+      )}
+
+      {/* 確認按鈕 */}
+      {!feedbackState && (
+          <button 
+            onClick={check} 
+            disabled={scrambledWords.length > 0 && selectedWords.length === 0} // 至少選一個字才能送出
+            className="bg-slate-800 text-white px-10 py-3 rounded-xl font-bold hover:bg-slate-900 transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Check Answer
+          </button>
+      )}
+    </div>
+  );
+};
+
 const SelectCardGame = ({ card, options, onAnswer, feedbackState, selectedOption }) => {
   return (
     <div className="flex flex-col items-center w-full animate-in fade-in slide-in-from-bottom-4 duration-300">
@@ -712,6 +812,19 @@ const SessionController = ({ vocabList, mode, onComplete, onUpdateItem }) => {
     
     if (activeTask !== 'spelling' && activeTask !== 'listening') speak(currentCard.german);
 
+    // set the time between the questions (the time to pronounce the answer)
+    let transitionDelay = 1500; 
+
+
+    if (activeTask === 'sentence') {
+        speak(currentCard.example);
+        transitionDelay = 4000; 
+        
+    } else if (activeTask !== 'spelling' && activeTask !== 'listening') {
+        speak(currentCard.german);
+        transitionDelay = 1500;
+    }
+
     setTimeout(() => {
         const stats = sessionStats[currentCard.id] || { failures: 0, appearances: 0 };
         const newAppearances = stats.appearances + 1;
@@ -833,7 +946,7 @@ const SessionController = ({ vocabList, mode, onComplete, onUpdateItem }) => {
         setSelectedOption(null);
         setIsProcessing(false);
         pickNext(nextPool, updatedStats);
-    }, 1500);
+    }, transitionDelay);
   };
 
   if (isFinished) {
@@ -927,7 +1040,14 @@ const SessionController = ({ vocabList, mode, onComplete, onUpdateItem }) => {
        )}
        <div className="flex-1 p-6 flex flex-col items-center justify-center overflow-y-auto relative">
            {currentCard.isNigate && mode !== 'hell' && (<div className="absolute top-4 right-4 flex items-center gap-1 text-xs font-bold text-red-500 bg-red-100 px-2 py-1 rounded-full"><Skull className="w-3 h-3" /> NIGATE</div>)}
-           {activeTask === 'sentence' && <SentenceFillGame key={currentCard.id + 'sen' + sessionStep} card={currentCard} options={currentOptions} onAnswer={handleAnswer} feedbackState={feedbackState} selectedOption={selectedOption} />}
+           {activeTask === 'sentence' && (
+               <SessionSentenceBuilder 
+                   key={currentCard.id + 'sen' + sessionStep} 
+                   card={currentCard} 
+                   onAnswer={handleAnswer} 
+                   feedbackState={feedbackState} 
+               />
+           )}
            {activeTask === 'select' && <SelectCardGame key={currentCard.id + 'sel' + sessionStep} card={currentCard} options={currentOptions} onAnswer={handleAnswer} feedbackState={feedbackState} selectedOption={selectedOption} />}
            {activeTask === 'reverseSelect' && <ReverseSelectGame key={currentCard.id + 'rev' + sessionStep} card={currentCard} options={currentOptions} onAnswer={handleAnswer} feedbackState={feedbackState} selectedOption={selectedOption} />}
            {activeTask === 'listening' && <ListeningGame key={currentCard.id + 'lis' + sessionStep} card={currentCard} options={currentOptions} onAnswer={handleAnswer} feedbackState={feedbackState} selectedOption={selectedOption} />}
