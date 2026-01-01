@@ -61,6 +61,149 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const STORAGE_KEY = 'vocab_multilingua_v1';
 // --- INITIAL DATA: 200 Core B1/B2 Vocabulary Items ---
+
+// --- CONSTANTS: Default Starter Vocabulary (15 words per language) ---
+// --- CONSTANTS: Default Starter Vocabulary (15 words per language) ---
+// Focused on the 8 supported languages
+const DEFAULT_VOCAB_SETS = {
+  'German': [
+    { german: "Hallo", english: "Hello", gender: "phr", example: "Hallo, wie geht es dir?" },
+    { german: "Danke", english: "Thank you", gender: "phr", example: "Vielen Dank!" },
+    { german: "Ja", english: "Yes", gender: "adv", example: "Ja, bitte." },
+    { german: "Nein", english: "No", gender: "adv", example: "Nein, danke." },
+    { german: "Wasser", english: "Water", gender: "n", example: "Ein Glas Wasser, bitte." },
+    { german: "Brot", english: "Bread", gender: "n", example: "Das Brot ist frisch." },
+    { german: "Mann", english: "Man", gender: "n", example: "Der Mann ist groß." },
+    { german: "Frau", english: "Woman", gender: "n", example: "Die Frau liest." },
+    { german: "Liebe", english: "Love", gender: "n", example: "Liebe ist wichtig." },
+    { german: "Haus", english: "House", gender: "n", example: "Das Haus ist alt." },
+    { german: "Katze", english: "Cat", gender: "n", example: "Die Katze schläft." },
+    { german: "Hund", english: "Dog", gender: "n", example: "Der Hund bellt." },
+    { german: "essen", english: "to eat", gender: "v", example: "Wir essen Pizza." },
+    { german: "trinken", english: "to drink", gender: "v", example: "Ich trinke Kaffee." },
+    { german: "glücklich", english: "happy", gender: "adj", example: "Ich bin glücklich." }
+  ],
+  'Spanish': [
+    { german: "Hola", english: "Hello", gender: "phr", example: "¡Hola! ¿Qué tal?" },
+    { german: "Gracias", english: "Thank you", gender: "phr", example: "Muchas gracias." },
+    { german: "Sí", english: "Yes", gender: "adv", example: "Sí, por favor." },
+    { german: "No", english: "No", gender: "adv", example: "No, gracias." },
+    { german: "Agua", english: "Water", gender: "n", example: "Agua, por favor." },
+    { german: "Pan", english: "Bread", gender: "n", example: "El pan está fresco." },
+    { german: "Hombre", english: "Man", gender: "n", example: "El hombre es alto." },
+    { german: "Mujer", english: "Woman", gender: "n", example: "La mujer lee." },
+    { german: "Amor", english: "Love", gender: "n", example: "El amor es ciego." },
+    { german: "Casa", english: "House", gender: "n", example: "Mi casa es tu casa." },
+    { german: "Gato", english: "Cat", gender: "n", example: "El gato negro." },
+    { german: "Perro", english: "Dog", gender: "n", example: "El perro ladra." },
+    { german: "Comer", english: "to eat", gender: "v", example: "Me gusta comer." },
+    { german: "Beber", english: "to drink", gender: "v", example: "Quiero beber agua." },
+    { german: "Feliz", english: "Happy", gender: "adj", example: "Soy muy feliz." }
+  ],
+  'Italian': [
+    { german: "Ciao", english: "Hello", gender: "phr", example: "Ciao! Come stai?" },
+    { german: "Grazie", english: "Thank you", gender: "phr", example: "Grazie mille." },
+    { german: "Sì", english: "Yes", gender: "adv", example: "Sì, per favore." },
+    { german: "No", english: "No", gender: "adv", example: "No, grazie." },
+    { german: "Acqua", english: "Water", gender: "n", example: "Acqua, per favore." },
+    { german: "Pane", english: "Bread", gender: "n", example: "Il pane è buono." },
+    { german: "Uomo", english: "Man", gender: "n", example: "L'uomo cammina." },
+    { german: "Donna", english: "Woman", gender: "n", example: "La donna canta." },
+    { german: "Amore", english: "Love", gender: "n", example: "L'amore è tutto." },
+    { german: "Casa", english: "House", gender: "n", example: "Vado a casa." },
+    { german: "Gatto", english: "Cat", gender: "n", example: "Il gatto dorme." },
+    { german: "Cane", english: "Dog", gender: "n", example: "Il cane gioca." },
+    { german: "Mangiare", english: "to eat", gender: "v", example: "Voglio mangiare." },
+    { german: "Bere", english: "to drink", gender: "v", example: "Posso bere?" },
+    { german: "Felice", english: "Happy", gender: "adj", example: "Sono felice." }
+  ],
+  'French': [
+    { german: "Bonjour", english: "Hello", gender: "phr", example: "Bonjour tout le monde." },
+    { german: "Merci", english: "Thank you", gender: "phr", example: "Merci beaucoup." },
+    { german: "Oui", english: "Yes", gender: "adv", example: "Oui, bien sûr." },
+    { german: "Non", english: "No", gender: "adv", example: "Non, désolé." },
+    { german: "Eau", english: "Water", gender: "n", example: "De l'eau, s'il vous plaît." },
+    { german: "Pain", english: "Bread", gender: "n", example: "Du pain frais." },
+    { german: "Homme", english: "Man", gender: "n", example: "L'homme est gentil." },
+    { german: "Femme", english: "Woman", gender: "n", example: "La femme travaille." },
+    { german: "Amour", english: "Love", gender: "n", example: "C'est mon amour." },
+    { german: "Maison", english: "House", gender: "n", example: "Belle maison." },
+    { german: "Chat", english: "Cat", gender: "n", example: "Le chat noir." },
+    { german: "Chien", english: "Dog", gender: "n", example: "Mon chien." },
+    { german: "Manger", english: "to eat", gender: "v", example: "J'aime manger." },
+    { german: "Boire", english: "to drink", gender: "v", example: "Il faut boire." },
+    { german: "Heureux", english: "Happy", gender: "adj", example: "Je suis heureux." }
+  ],
+  'Dutch': [
+    { german: "Hallo", english: "Hello", gender: "phr", example: "Hallo allemaal." },
+    { german: "Dank je", english: "Thank you", gender: "phr", example: "Dank je wel." },
+    { german: "Ja", english: "Yes", gender: "adv", example: "Ja, graag." },
+    { german: "Nee", english: "No", gender: "adv", example: "Nee, bedankt." },
+    { german: "Water", english: "Water", gender: "n", example: "Mag ik wat water?" },
+    { german: "Brood", english: "Bread", gender: "n", example: "Lekker brood." },
+    { german: "Man", english: "Man", gender: "n", example: "De man loopt." },
+    { german: "Vrouw", english: "Woman", gender: "n", example: "De vrouw lacht." },
+    { german: "Liefde", english: "Love", gender: "n", example: "Liefde is mooi." },
+    { german: "Huis", english: "House", gender: "n", example: "Ons huis." },
+    { german: "Kat", english: "Cat", gender: "n", example: "De kat miauwt." },
+    { german: "Hond", english: "Dog", gender: "n", example: "De hond blaft." },
+    { german: "Eten", english: "to eat", gender: "v", example: "Wij eten samen." },
+    { german: "Drinken", english: "to drink", gender: "v", example: "Wat wil je drinken?" },
+    { german: "Gelukkig", english: "Happy", gender: "adj", example: "Ik ben gelukkig." }
+  ],
+  'Russian': [
+    { german: "Привет", english: "Hello", gender: "phr", example: "Привет! Как дела?" },
+    { german: "Спасибо", english: "Thank you", gender: "phr", example: "Большое спасибо." },
+    { german: "Да", english: "Yes", gender: "adv", example: "Да, пожалуйста." },
+    { german: "Нет", english: "No", gender: "adv", example: "Нет, спасибо." },
+    { german: "Вода", english: "Water", gender: "n", example: "Можно мне воды?" },
+    { german: "Хлеб", english: "Bread", gender: "n", example: "Свежий хлеб." },
+    { german: "Мужчина", english: "Man", gender: "n", example: "Этот мужчина." },
+    { german: "Женщина", english: "Woman", gender: "n", example: "Эта женщина." },
+    { german: "Любовь", english: "Love", gender: "n", example: "Любовь важна." },
+    { german: "Дом", english: "House", gender: "n", example: "Мой дом." },
+    { german: "Кот", english: "Cat", gender: "n", example: "Кот спит." },
+    { german: "Собака", english: "Dog", gender: "n", example: "Собака лает." },
+    { german: "Есть", english: "to eat", gender: "v", example: "Я хочу есть." },
+    { german: "Пить", english: "to drink", gender: "v", example: "Я хочу пить." },
+    { german: "Счастливый", english: "Happy", gender: "adj", example: "Я счастливый." }
+  ],
+  'Polish': [
+    { german: "Cześć", english: "Hello", gender: "phr", example: "Cześć! Jak się masz?" },
+    { german: "Dziękuję", english: "Thank you", gender: "phr", example: "Dziękuję bardzo." },
+    { german: "Tak", english: "Yes", gender: "adv", example: "Tak, poproszę." },
+    { german: "Nie", english: "No", gender: "adv", example: "Nie, dziękuję." },
+    { german: "Woda", english: "Water", gender: "n", example: "Poproszę wodę." },
+    { german: "Chleb", english: "Bread", gender: "n", example: "Świeży chleb." },
+    { german: "Mężczyzna", english: "Man", gender: "n", example: "To jest mężczyzna." },
+    { german: "Kobieta", english: "Woman", gender: "n", example: "To jest kobieta." },
+    { german: "Miłość", english: "Love", gender: "n", example: "Miłość jest ważna." },
+    { german: "Dom", english: "House", gender: "n", example: "Duży dom." },
+    { german: "Kot", english: "Cat", gender: "n", example: "Kot śpi." },
+    { german: "Pies", english: "Dog", gender: "n", example: "Pies szczeka." },
+    { german: "Jeść", english: "to eat", gender: "v", example: "Lubię jeść." },
+    { german: "Pić", english: "to drink", gender: "v", example: "Chcę pić." },
+    { german: "Szczęśliwy", english: "Happy", gender: "adj", example: "Jestem szczęśliwy." }
+  ],
+  'Czech': [
+    { german: "Ahoj", english: "Hello", gender: "phr", example: "Ahoj! Jak se máš?" },
+    { german: "Děkuji", english: "Thank you", gender: "phr", example: "Děkuji moc." },
+    { german: "Ano", english: "Yes", gender: "adv", example: "Ano, prosím." },
+    { german: "Ne", english: "No", gender: "adv", example: "Ne, děkuji." },
+    { german: "Voda", english: "Water", gender: "n", example: "Vodu, prosím." },
+    { german: "Chléb", english: "Bread", gender: "n", example: "Čerstvý chléb." },
+    { german: "Muž", english: "Man", gender: "n", example: "Ten muž je vysoký." },
+    { german: "Žena", english: "Woman", gender: "n", example: "Ta žena čte." },
+    { german: "Láska", english: "Love", gender: "n", example: "Láska je krásná." },
+    { german: "Dům", english: "House", gender: "n", example: "Náš dům." },
+    { german: "Kočka", english: "Cat", gender: "n", example: "Kočka spí." },
+    { german: "Pes", english: "Dog", gender: "n", example: "Pes štěká." },
+    { german: "Jíst", english: "to eat", gender: "v", example: "Jíme oběd." },
+    { german: "Pít", english: "to drink", gender: "v", example: "Piju kávu." },
+    { german: "Šťastný", english: "Happy", gender: "adj", example: "Jsem šťastný." }
+  ]
+};
+
 const INITIAL_VOCAB_DATA = [
   // Nouns (Abstract & Society)
   { id: 1, german: "die Herausforderung", english: "the challenge", example: "Das ist eine große Herausforderung für uns.", gender: "f" },
@@ -1835,12 +1978,12 @@ const VocabBrowser = ({ onBack, vocabList, onUpdateItem, onAddItem, onDeleteItem
                         {/* UPDATE: Uses dynamic placeholder */}
                         <input className="flex-1 p-2 border rounded font-bold" placeholder={targetLangLabel} value={newWord.german} onChange={e => setNewWord({...newWord, german: e.target.value})} />
                         <select className="p-2 border rounded" value={newWord.gender} onChange={e => setNewWord({...newWord, gender: e.target.value})}>
-                            <option value="m">m</option>
-                            <option value="f">f</option>
-                            <option value="n">n</option>
-                            <option value="v">v</option>
-                            <option value="adj">adj</option>
-                            <option value="adv">adv</option>
+                          <option value="n">Noun (n)</option>
+                          <option value="v">Verb (v)</option>
+                          <option value="adj">Adjective (adj)</option>
+                          <option value="adv">Adverb (adv)</option>
+                          <option value="phr">Phrase (phr)</option>
+                          <option value="other">Other</option>
                         </select>
                     </div>
                     <input className="w-full p-2 border rounded mb-2" placeholder="English / Native" value={newWord.english} onChange={e => setNewWord({...newWord, english: e.target.value})} />
@@ -1859,12 +2002,12 @@ const VocabBrowser = ({ onBack, vocabList, onUpdateItem, onAddItem, onDeleteItem
                                 <div className="flex gap-2">
                                     <input className="flex-1 font-bold border-b" value={editForm.german} onChange={e => setEditForm({...editForm, german: e.target.value})}/>
                                     <select className="border-b bg-white" value={editForm.gender} onChange={e => setEditForm({...editForm, gender: e.target.value})}>
-                                        <option value="m">m</option>
-                                        <option value="f">f</option>
-                                        <option value="n">n</option>
-                                        <option value="v">v</option>
-                                        <option value="adj">adj</option>
-                                        <option value="adv">adv</option>
+                                      <option value="n">Noun (n)</option>
+                                      <option value="v">Verb (v)</option>
+                                      <option value="adj">Adjective (adj)</option>
+                                      <option value="adv">Adverb (adv)</option>
+                                      <option value="phr">Phrase (phr)</option>
+                                      <option value="other">Other</option>
                                     </select>
                                 </div>
                                 <input className="w-full border-b" value={editForm.english} onChange={e => setEditForm({...editForm, english: e.target.value})}/>
@@ -2142,30 +2285,35 @@ const SUPPORTED_LANGUAGES = [
   { code: 'French', label: 'French (Français)', flag: '🇫🇷', color: 'bg-blue-600', speechCode: 'fr-FR' },
   { code: 'Dutch', label: 'Dutch (Nederlands)', flag: '🇳🇱', color: 'bg-orange-400', speechCode: 'nl-NL' },
   { code: 'Russian', label: 'Russian (Русский)', flag: '🇷🇺', color: 'bg-red-600', speechCode: 'ru-RU' },
+  { code: 'Polish', label: 'Polish (Polski)', flag: '🇵🇱', color: 'bg-rose-500', speechCode: 'pl-PL' },
+  { code: 'Czech', label: 'Czech (Čeština)', flag: '🇨🇿', color: 'bg-blue-600', speechCode: 'cs-CZ' },
 ];
 
 // --- NEW COMPONENT: Deck Library (The Menu Page) ---
 // 修改原本的 DeckLibrary 元件
 // 加入 user, onLogin, onLogout 這三個新的 props
-const DeckLibrary = ({ decks, onSelectDeck, onAddDeck, user, onLogin, onLogout }) => {
+// --- 修改後的 DeckLibrary (舊風格 + 刪除功能) ---
+const DeckLibrary = ({ decks, onSelectDeck, onAddDeck, onDeleteDeck, user, onLogin, onLogout }) => {
   const [isCreating, setIsCreating] = useState(false);
   const [newDeckData, setNewDeckData] = useState({ title: '', language: 'German' });
+  const [loadDefault, setLoadDefault] = useState(true);
 
   const handleCreate = () => {
     if (!newDeckData.title) return;
-    onAddDeck(newDeckData.title, newDeckData.language);
+    onAddDeck(newDeckData.title, newDeckData.language, loadDefault);
     setIsCreating(false);
     setNewDeckData({ title: '', language: 'German' });
+    setLoadDefault(true);
   };
 
   const getLangInfo = (langCode) => SUPPORTED_LANGUAGES.find(l => l.code === langCode) || SUPPORTED_LANGUAGES[0];
 
   return (
     <div className="flex flex-col h-full bg-slate-50 relative overflow-hidden">
-      {/* 1. Header 修改：加入使用者資訊與登出按鈕 */}
+      {/* 1. Header (保持原本的深色圓弧設計) */}
       <div className="bg-slate-900 text-white p-8 pt-12 pb-16 rounded-b-[3rem] shadow-xl relative z-10 flex flex-col items-center">
          
-         {/* User Profile Section (Top Right) */}
+         {/* User Profile Section */}
          <div className="absolute top-6 right-6">
             {user && !user.isAnonymous ? (
                 <div className="flex items-center gap-3 bg-slate-800 p-1.5 pl-3 rounded-full border border-slate-700">
@@ -2198,7 +2346,7 @@ const DeckLibrary = ({ decks, onSelectDeck, onAddDeck, user, onLogin, onLogout }
          <p className="text-slate-400">Select a language deck to start learning</p>
       </div>
 
-      {/* Grid Content (保持不變) */}
+      {/* Grid Content */}
       <div className="flex-1 overflow-y-auto p-6 -mt-10 relative z-20">
         <div className="grid grid-cols-1 gap-4 max-w-md mx-auto">
           {/* Create New Deck Button */}
@@ -2212,30 +2360,46 @@ const DeckLibrary = ({ decks, onSelectDeck, onAddDeck, user, onLogin, onLogout }
             <span className="font-bold text-slate-600 group-hover:text-indigo-700">Create New Deck</span>
           </button>
 
-          {/* Existing Decks */}
+          {/* Existing Decks (Modified with Delete) */}
           {Object.values(decks).map(deck => {
             const langInfo = getLangInfo(deck.language);
             const wordCount = deck.words ? deck.words.filter(w => !w.isDeleted).length : 0;
             const masteredCount = deck.words ? deck.words.filter(w => w.status === STATUS.MASTERED && !w.isDeleted).length : 0;
             
             return (
-              <button 
+              <div 
                 key={deck.id} 
                 onClick={() => onSelectDeck(deck.id)}
-                className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md hover:border-indigo-200 transition-all text-left flex items-center gap-4 relative overflow-hidden group"
+                className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md hover:border-indigo-200 transition-all text-left relative overflow-hidden group cursor-pointer"
               >
+                {/* 🚨 DELETE BUTTON (New Feature) */}
+                {/* 只有當牌組數量 > 1 時才顯示刪除鈕，或者你想允許刪光也可以 */}
+                <button 
+                    onClick={(e) => {
+                        e.stopPropagation(); // 阻止冒泡：避免點刪除時同時打開牌組
+                        onDeleteDeck(deck.id); 
+                    }}
+                    className="absolute top-3 right-3 z-30 p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-full transition-all opacity-0 group-hover:opacity-100"
+                    title="Delete Deck"
+                >
+                    <Trash2 className="w-5 h-5" />
+                </button>
+
                 <div className="absolute right-0 top-0 p-10 bg-slate-50 rounded-bl-full opacity-0 group-hover:opacity-100 transition-opacity -mr-8 -mt-8 pointer-events-none"></div>
-                <div className="text-4xl shadow-sm rounded-lg overflow-hidden">{langInfo.flag}</div>
-                <div className="flex-1 relative z-10">
-                  <h3 className="font-bold text-slate-800 text-lg">{deck.title}</h3>
-                  <p className="text-xs text-slate-500 font-medium uppercase tracking-wider mb-1">{langInfo.label}</p>
-                  <div className="flex items-center gap-3 text-xs text-slate-400">
-                    <span className="flex items-center gap-1"><ListChecks className="w-3 h-3" /> {wordCount} words</span>
-                    <span className="flex items-center gap-1 text-yellow-600"><Trophy className="w-3 h-3" /> {masteredCount} mastered</span>
-                  </div>
+                
+                <div className="flex items-center gap-4 relative z-10">
+                    <div className="text-4xl shadow-sm rounded-lg overflow-hidden">{langInfo.flag}</div>
+                    <div className="flex-1">
+                    <h3 className="font-bold text-slate-800 text-lg pr-6">{deck.title}</h3>
+                    <p className="text-xs text-slate-500 font-medium uppercase tracking-wider mb-1">{langInfo.label}</p>
+                    <div className="flex items-center gap-3 text-xs text-slate-400">
+                        <span className="flex items-center gap-1"><ListChecks className="w-3 h-3" /> {wordCount} words</span>
+                        <span className="flex items-center gap-1 text-yellow-600"><Trophy className="w-3 h-3" /> {masteredCount} mastered</span>
+                    </div>
+                    </div>
+                    <ArrowRight className="text-slate-300 w-5 h-5 group-hover:text-indigo-500 group-hover:translate-x-1 transition-all" />
                 </div>
-                <ArrowRight className="text-slate-300 w-5 h-5 group-hover:text-indigo-500 group-hover:translate-x-1 transition-all" />
-              </button>
+              </div>
             );
           })}
         </div>
@@ -2272,6 +2436,13 @@ const DeckLibrary = ({ decks, onSelectDeck, onAddDeck, user, onLogin, onLogout }
               onChange={e => setNewDeckData({...newDeckData, title: e.target.value})}
             />
 
+            <div className="flex items-center gap-2 mb-6 ml-1 cursor-pointer" onClick={() => setLoadDefault(!loadDefault)}>
+                <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${loadDefault ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300 bg-white'}`}>
+                    {loadDefault && <CheckCircle className="w-3 h-3 text-white" />}
+                </div>
+                <span className="text-sm font-bold text-slate-600">Load starter vocabulary (15 words)</span>
+            </div>
+
             <div className="flex gap-3">
               <button onClick={() => setIsCreating(false)} className="flex-1 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl transition-colors">Cancel</button>
               <button onClick={handleCreate} className="flex-1 py-3 bg-slate-900 text-white font-bold rounded-xl shadow-lg hover:bg-slate-800 transition-all transform active:scale-95">Create Deck</button>
@@ -2291,10 +2462,8 @@ const App = () => {
   const [view, setView] = useState('decks');
   
   // [Core State Change] 'decks' replaces the original 'vocabList'
-  const [decks, setDecks] = useState({
-    'default': { id: 'default', title: 'Loading...', language: 'German', words: [] }
-  });
-  const [currentDeckId, setCurrentDeckId] = useState('default');
+  const [decks, setDecks] = useState({});
+  const [currentDeckId, setCurrentDeckId] = useState(null);
   
   // [Derived State] Dynamically calculated so child components still see a single list
   const currentDeck = decks[currentDeckId] || Object.values(decks)[0] || { words: [], language: 'German' };
@@ -2362,27 +2531,19 @@ const App = () => {
         // 這裡完全不管舊資料，直接給他一套全新的德語牌組
         console.log("No data found. Initializing new user...");
         
-        const initDeckId = 'german_core';
-        const initDecks = {
-            [initDeckId]: {
-                id: initDeckId,
-                title: 'Core B1/B2',
-                language: 'German',
-                // 使用你預設的 FULL_VOCAB_DATA
-                words: FULL_VOCAB_DATA.map(normalizeVocabItem)
-            }
-        };
+        // const initDeckId = 'german_core';
+        const initDecks = {};
 
         // 直接寫入資料庫
         await setDoc(docRef, { 
-            decks: initDecks, 
-            currentDeckId: initDeckId,
-            lastUpdated: new Date().toISOString() 
+          decks: initDecks, 
+          currentDeckId: null,
+          lastUpdated: new Date().toISOString() 
         });
         
         // 設定本地 State
         setDecks(initDecks);
-        setCurrentDeckId(initDeckId);
+        setCurrentDeckId(null);
         setLoading(false);
       }
     });
@@ -2476,13 +2637,26 @@ const App = () => {
       });
   };
 
-  const handleAddDeck = (title, language) => {
+  // 修改 App 元件內的 handleAddDeck，接收 loadDefaults 參數
+  const handleAddDeck = (title, language, loadDefaults) => {
     const newId = `deck_${Date.now()}`;
+    
+    // 決定要不要載入預設字
+    let starterWords = [];
+    if (loadDefaults && DEFAULT_VOCAB_SETS[language]) {
+        // 正規化單字結構
+        starterWords = DEFAULT_VOCAB_SETS[language].map((w, i) => normalizeVocabItem({
+            ...w, 
+            id: i + 1, // 重新編號
+            isCustomized: false // 標記為系統預設
+        }));
+    }
+
     const newDeck = {
         id: newId,
         title: title,
         language: language,
-        words: [] 
+        words: starterWords // 放入單字
     };
     
     setDecks(prev => {
@@ -2491,7 +2665,53 @@ const App = () => {
         return next;
     });
     setCurrentDeckId(newId);
-    setView('vocab'); 
+    
+    // 如果有預設單字，直接回 Dashboard，不然去 Vocab 頁面加字
+    setView('home');
+  };
+
+  // --- 在 App 元件內 (handleAddDeck 下方) ---
+
+  // --- 修改後的 handleDeleteDeck (允許刪光光) ---
+  const handleDeleteDeck = (deckId) => {
+    // 1. 【已移除】原本的「至少留一個」限制
+    // if (deckKeys.length <= 1) ... (這段被拿掉了)
+
+    // 2. 確認刪除
+    if (!confirm("Are you sure you want to delete this deck? This cannot be undone.")) {
+        return;
+    }
+
+    const deckKeys = Object.keys(decks);
+    
+    // 3. 計算刪除後的「下一個作用中牌組 ID」
+    // 如果還有別的牌組，就選別的；如果刪光了，就是 null
+    const remainingKeys = deckKeys.filter(k => k !== deckId);
+    let nextActiveId = currentDeckId;
+
+    if (deckId === currentDeckId) {
+        // 如果刪掉的是當前正在看的，那就要換一個
+        nextActiveId = remainingKeys.length > 0 ? remainingKeys[0] : null;
+        setCurrentDeckId(nextActiveId);
+    }
+
+    // 4. 執行刪除
+    setDecks(prev => {
+        const newDecks = { ...prev };
+        delete newDecks[deckId];
+        
+        // 存檔 (如果 nextActiveId 是 null，就存 null，這樣下次進來就不會亂選)
+        saveToCloud(newDecks, nextActiveId);
+        
+        return newDecks;
+    });
+
+    // 5. 【關鍵保護機制】
+    // 如果刪光了 (nextActiveId 為 null)，或者刪掉的是當前牌組
+    // 強制跳轉回 'decks' (圖書館頁面)，避免停留在 Dashboard 導致崩潰
+    if (!nextActiveId || deckId === currentDeckId) {
+        setView('decks');
+    }
   };
 
   const handleSelectDeck = (deckId) => {
@@ -2551,6 +2771,7 @@ const App = () => {
                 onLogout={handleLogout} // 傳入登出函式
                 onSelectDeck={handleSelectDeck}
                 onAddDeck={handleAddDeck}
+                onDeleteDeck={handleDeleteDeck}
              />
           )}
 
