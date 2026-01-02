@@ -234,14 +234,33 @@ const SESSION_APPEARANCE_LIMIT = 5;
 // --- UTILS ---
 const shuffleArray = (array) => [...array].sort(() => Math.random() - 0.5);
 
+// --- 修改 speak 函式 ---
 const speak = (text, langCode = 'de-DE') => {
   if (!text) return;
   if ('speechSynthesis' in window) {
-    window.speechSynthesis.cancel();
+    const synth = window.speechSynthesis;
+    synth.cancel(); // 停止上一句
+
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = langCode; // 使用傳入的語言代碼
+    utterance.lang = langCode;
     utterance.rate = 0.9;
-    window.speechSynthesis.speak(utterance);
+
+    // 🚨 關鍵修正：強制抓取對應語言的「系統聲音檔」
+    // 這能解決 Mac 上預設聲音亂跳回英文或德文的問題
+    const voices = synth.getVoices();
+    // 1. 找完全符合 (e.g., 'es-ES')
+    let targetVoice = voices.find(v => v.lang === langCode);
+    // 2. 找不到則找部分符合 (e.g., 'es-MX' 也可以用在 'es-ES')
+    if (!targetVoice) {
+        const shortLang = langCode.split('-')[0];
+        targetVoice = voices.find(v => v.lang.startsWith(shortLang));
+    }
+    
+    if (targetVoice) {
+        utterance.voice = targetVoice;
+    }
+
+    synth.speak(utterance);
   }
 };
 
@@ -496,7 +515,7 @@ const ReverseSelectGame = ({ card, options, onAnswer, feedbackState, selectedOpt
   );
 };
 
-const ListeningGame = ({ card, options, onAnswer, feedbackState, selectedOption, timeLimit = 4 }) => {
+const ListeningGame = ({ card, options, onAnswer, feedbackState, selectedOption, timeLimit = 4, langCode }) => {
   const [timeLeft, setTimeLeft] = useState(timeLimit);
   useEffect(() => {
     // Reset timer when card changes
@@ -506,18 +525,18 @@ const ListeningGame = ({ card, options, onAnswer, feedbackState, selectedOption,
   useEffect(() => {
     // Only speak initially if NOT checking answer yet
     if (!feedbackState) {
-        speak(card.german);
+        speak(card.german, langCode);
         const timer = setInterval(() => setTimeLeft(t => Math.max(0, t - 0.1)), 100);
         return () => clearInterval(timer);
     }
-  }, [card, feedbackState]);
+  }, [card, feedbackState, langCode]);
   
   useEffect(() => { if (timeLeft === 0 && !feedbackState) onAnswer(null, false); }, [timeLeft, onAnswer, feedbackState]);
 
   return (
     <div className="flex flex-col items-center w-full animate-in fade-in slide-in-from-bottom-4 duration-300">
       <div className="text-sm uppercase text-pink-500 font-bold mb-6 tracking-wider">Listening Challenge</div>
-      <button onClick={() => speak(card.german)} className="w-24 h-24 rounded-full bg-pink-100 flex items-center justify-center text-pink-600 mb-6 hover:scale-105 transition-transform shadow-lg border-4 border-pink-200"><Volume2 className="w-10 h-10" /></button>
+      <button onClick={() => speak(card.german, langCode)} className="w-24 h-24 rounded-full bg-pink-100 flex items-center justify-center text-pink-600 mb-6 hover:scale-105 transition-transform shadow-lg border-4 border-pink-200"><Volume2 className="w-10 h-10" /></button>
       <div className="w-full max-w-xs h-2 bg-slate-200 rounded-full mb-8 overflow-hidden"><div className="h-full bg-pink-500 transition-all duration-100 ease-linear" style={{ width: `${(timeLeft / timeLimit) * 100}%` }}/></div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-md">
         {options.map(opt => {
@@ -746,18 +765,20 @@ const SessionController = ({ vocabList, mode, onComplete, onUpdateItem, langCode
     setFeedbackState(isCorrect ? 'correct' : 'wrong');
     setSelectedOption(optionId);
     
-    if (activeTask !== 'spelling' && activeTask !== 'listening') speak(currentCard.german);
+    if (activeTask !== 'spelling' && activeTask !== 'listening') {
+      speak(currentCard.german, langCode); 
+    }
 
     // set the time between the questions (the time to pronounce the answer)
     let transitionDelay = 1500; 
 
 
     if (activeTask === 'sentence') {
-        speak(currentCard.example);
+        speak(currentCard.example, langCode);
         transitionDelay = 4000; 
         
     } else if (activeTask !== 'spelling' && activeTask !== 'listening') {
-        speak(currentCard.german);
+        speak(currentCard.german, langCode);
         transitionDelay = 1500;
     }
 
@@ -989,7 +1010,7 @@ const SessionController = ({ vocabList, mode, onComplete, onUpdateItem, langCode
            )}
            {activeTask === 'select' && <SelectCardGame key={currentCard.id + 'sel' + sessionStep} card={currentCard} options={currentOptions} onAnswer={handleAnswer} feedbackState={feedbackState} selectedOption={selectedOption} />}
            {activeTask === 'reverseSelect' && <ReverseSelectGame key={currentCard.id + 'rev' + sessionStep} card={currentCard} options={currentOptions} onAnswer={handleAnswer} feedbackState={feedbackState} selectedOption={selectedOption} />}
-           {activeTask === 'listening' && <ListeningGame key={currentCard.id + 'lis' + sessionStep} card={currentCard} options={currentOptions} onAnswer={handleAnswer} feedbackState={feedbackState} selectedOption={selectedOption} />}
+           {activeTask === 'listening' && <ListeningGame key={currentCard.id + 'lis' + sessionStep} card={currentCard} options={currentOptions} onAnswer={handleAnswer} feedbackState={feedbackState} selectedOption={selectedOption} langCode={langCode}/>}
            {/* FIX: Add sessionStep to key to force reset on re-render of same word */}
            {activeTask === 'spelling' && <SpellingGame key={currentCard.id + 'spe' + sessionStep} card={currentCard} onAnswer={handleAnswer} feedbackState={feedbackState} />}
        </div>
@@ -1025,7 +1046,7 @@ const ArcadeConfig = ({ onStart, title, onBack, vocabList }) => {
 };
 
 // 1. BLITZ (Standard German -> English)
-const FlashcardGame = ({ onBack, vocabList, onUpdateItem }) => {
+const FlashcardGame = ({ onBack, vocabList, onUpdateItem, langCode }) => {
   const [score, setScore] = useState(0);
   const [lives, setLives] = useState(3);
   const [currentCard, setCurrentCard] = useState(null);
@@ -1075,7 +1096,7 @@ const FlashcardGame = ({ onBack, vocabList, onUpdateItem }) => {
       const correct = option.id === currentCard.id;
       setSelectedOptionId(option.id);
       setFeedback(correct ? 'correct' : 'wrong');
-      speak(currentCard.german);
+      speak(currentCard.german, langCode);
       setTimeout(() => {
           setTestedWords(prev => [...prev, { ...currentCard, correct }]);
           if (correct) {
@@ -1140,7 +1161,7 @@ const FlashcardGame = ({ onBack, vocabList, onUpdateItem }) => {
 };
 
 // 1.5 REVERSE BLITZ (English -> German)
-const ReverseBlitzGame = ({ onBack, vocabList, onUpdateItem }) => {
+const ReverseBlitzGame = ({ onBack, vocabList, onUpdateItem, langCode }) => {
   const [score, setScore] = useState(0);
   const [lives, setLives] = useState(3);
   const [currentCard, setCurrentCard] = useState(null);
@@ -1192,7 +1213,7 @@ const ReverseBlitzGame = ({ onBack, vocabList, onUpdateItem }) => {
       setFeedback(correct ? 'correct' : 'wrong');
       
       // Speak the correct German word immediately for reinforcement
-      speak(currentCard.german);
+      speak(currentCard.german, langCode);
 
       setTimeout(() => {
           setTestedWords(prev => [...prev, { ...currentCard, correct }]);
@@ -1259,7 +1280,7 @@ const ReverseBlitzGame = ({ onBack, vocabList, onUpdateItem }) => {
 };
 
 // 1.6 LISTENING GAME (ARCADE)
-const ArcadeListeningGame = ({ onBack, vocabList, onUpdateItem }) => {
+const ArcadeListeningGame = ({ onBack, vocabList, onUpdateItem, langCode }) => {
   const [score, setScore] = useState(0);
   const [lives, setLives] = useState(3);
   const [currentCard, setCurrentCard] = useState(null);
@@ -1283,7 +1304,7 @@ const ArcadeListeningGame = ({ onBack, vocabList, onUpdateItem }) => {
     setProcessing(false);
     
     // Play audio on start of round
-    setTimeout(() => speak(target.german), 500); 
+    setTimeout(() => speak(target.german, langCode), 500); 
   }, [vocabList]);
 
   useEffect(() => { if (!isActive && !isGameOver && vocabList.length > 0) nextRound(); }, [vocabList]);
@@ -1296,7 +1317,7 @@ const ArcadeListeningGame = ({ onBack, vocabList, onUpdateItem }) => {
       setFeedback(correct ? 'correct' : 'wrong');
       
       // Reinforce audio
-      speak(currentCard.german);
+      speak(currentCard.german, langCode);
 
       setTimeout(() => {
           setTestedWords(prev => [...prev, { ...currentCard, correct }]);
@@ -1587,7 +1608,7 @@ const SentenceBuilder = ({ onBack, vocabList }) => {
 };
 
 // 4. SPELLING BEE
-const ArcadeSpellingInput = ({ card, onAnswer }) => {
+const ArcadeSpellingInput = ({ card, onAnswer, langCode }) => {
     const [input, setInput] = useState('');
     const [checked, setChecked] = useState(false);
     const [isCorrect, setIsCorrect] = useState(false);
@@ -1598,7 +1619,7 @@ const ArcadeSpellingInput = ({ card, onAnswer }) => {
       const correct = cleanInput === cleanTarget;
       setIsCorrect(correct);
       setChecked(true);
-      speak(card.german); 
+      speak(card.german, langCode); 
       setTimeout(() => {
           onAnswer(correct);
           setInput('');
@@ -1658,7 +1679,7 @@ const ArcadeSpellingBee = ({ onBack, vocabList, onUpdateItem }) => {
     );
 }
 
-const ArcadeContainer = ({ gameType, vocabList, onBack, onUpdateItem }) => {
+const ArcadeContainer = ({ gameType, vocabList, onBack, onUpdateItem, langCode }) => {
     const [config, setConfig] = useState(null);
     if (!config) {
         let title = "Arcade";
@@ -1684,12 +1705,12 @@ const ArcadeContainer = ({ gameType, vocabList, onBack, onUpdateItem }) => {
         );
     }
     switch(gameType) {
-        case 'blitz': return <FlashcardGame vocabList={playableList} onBack={onBack} onUpdateItem={onUpdateItem} />;
-        case 'reverse-blitz': return <ReverseBlitzGame vocabList={playableList} onBack={onBack} onUpdateItem={onUpdateItem} />;
-        case 'listening': return <ArcadeListeningGame vocabList={playableList} onBack={onBack} onUpdateItem={onUpdateItem} />;
+        case 'blitz': return <FlashcardGame vocabList={playableList} onBack={onBack} onUpdateItem={onUpdateItem} langCode={langCode} />;
+        case 'reverse-blitz': return <ReverseBlitzGame vocabList={playableList} onBack={onBack} onUpdateItem={onUpdateItem} langCode={langCode} />;
+        case 'listening': return <ArcadeListeningGame vocabList={playableList} onBack={onBack} onUpdateItem={onUpdateItem} langCode={langCode} />;
         case 'memory': return <MemoryMatchGame vocabList={playableList} onBack={onBack} />;
         case 'sentence': return <SentenceBuilder vocabList={playableList} onBack={onBack} />;
-        case 'spelling': return <ArcadeSpellingBee vocabList={playableList} onBack={onBack} onUpdateItem={onUpdateItem} />;
+        case 'spelling': return <ArcadeSpellingBee vocabList={playableList} onBack={onBack} onUpdateItem={onUpdateItem} langCode={langCode} />;
         default: return <div>Unknown Game</div>;
     }
 };
@@ -1818,7 +1839,7 @@ const VocabBrowser = ({ onBack, vocabList, onUpdateItem, onAddItem, onDeleteItem
                                     <div className="flex items-center gap-2 mb-1">
                                         <span className="font-bold text-slate-800 text-lg">{item.german}</span>
                                         <span className="text-xs bg-slate-100 px-1.5 py-0.5 rounded text-slate-500 font-mono">{item.gender}</span>
-                                        <button onClick={() => speak(item.german)} className="text-slate-400 hover:text-indigo-600 ml-1"><Volume2 className="w-4 h-4"/></button>
+                                        <button onClick={() => speak(item.german, langCode)} className="text-slate-400 hover:text-indigo-600 ml-1"><Volume2 className="w-4 h-4"/></button>
                                         {item.isNigate && <Skull className="w-4 h-4 text-red-500" />}
                                     </div>
                                     <div className="text-slate-500 mb-2">{item.english}</div>
