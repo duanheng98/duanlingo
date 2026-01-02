@@ -555,7 +555,7 @@ const ListeningGame = ({ card, options, onAnswer, feedbackState, selectedOption,
   );
 };
 
-const SpellingGame = ({ card, onAnswer, feedbackState }) => {
+const SpellingGame = ({ card, onAnswer, feedbackState, langCode }) => {
   const [input, setInput] = useState('');
 
   // FIX: Reset input when card ID changes to ensure clean slate
@@ -566,7 +566,7 @@ const SpellingGame = ({ card, onAnswer, feedbackState }) => {
     const cleanInput = input.trim().toLowerCase().replace(/\s/g, '');
     const cleanTarget = card.german.toLowerCase().replace(/\s/g, '');
     const correct = cleanInput === cleanTarget;
-    speak(card.german); 
+    speak(card.german, langCode); 
     onAnswer(null, correct);
   };
 
@@ -1012,7 +1012,7 @@ const SessionController = ({ vocabList, mode, onComplete, onUpdateItem, langCode
            {activeTask === 'reverseSelect' && <ReverseSelectGame key={currentCard.id + 'rev' + sessionStep} card={currentCard} options={currentOptions} onAnswer={handleAnswer} feedbackState={feedbackState} selectedOption={selectedOption} />}
            {activeTask === 'listening' && <ListeningGame key={currentCard.id + 'lis' + sessionStep} card={currentCard} options={currentOptions} onAnswer={handleAnswer} feedbackState={feedbackState} selectedOption={selectedOption} langCode={langCode}/>}
            {/* FIX: Add sessionStep to key to force reset on re-render of same word */}
-           {activeTask === 'spelling' && <SpellingGame key={currentCard.id + 'spe' + sessionStep} card={currentCard} onAnswer={handleAnswer} feedbackState={feedbackState} />}
+           {activeTask === 'spelling' && <SpellingGame key={currentCard.id + 'spe' + sessionStep} card={currentCard} onAnswer={handleAnswer} feedbackState={feedbackState} langCode={langCode}/>}
        </div>
     </div>
   );
@@ -1368,7 +1368,7 @@ const ArcadeListeningGame = ({ onBack, vocabList, onUpdateItem, langCode }) => {
               <div className="mb-2 text-xs font-bold text-slate-400 uppercase tracking-widest">Listen & Translate</div>
               
               <button 
-                onClick={() => speak(currentCard?.german)}
+                onClick={() => speak(currentCard?.german, langCode)}
                 className="w-32 h-32 rounded-full bg-pink-100 flex items-center justify-center text-pink-600 mb-8 hover:scale-105 transition-transform shadow-lg border-4 border-pink-200"
               >
                 <Volume2 className="w-12 h-12" />
@@ -1673,7 +1673,7 @@ const ArcadeSpellingBee = ({ onBack, vocabList, onUpdateItem }) => {
             </div>
             <div className="flex-1 flex items-center justify-center p-4">
                 {/* Use combined Key to force re-render on every turn */}
-                <ArcadeSpellingInput key={`${card.id}-${turnCount}`} card={card} onAnswer={handleAnswer} />
+                <ArcadeSpellingInput key={`${card.id}-${turnCount}`} card={card} onAnswer={handleAnswer} langCode={langCode}/>
             </div>
         </div>
     );
