@@ -237,65 +237,49 @@ const shuffleArray = (array) => [...array].sort(() => Math.random() - 0.5);
 // --- 修改 speak 函式 ---
 // --- 修改 speak 函式 (高品質語音版) ---
 // --- 修改 speak 函式 (究極音質版) ---
-const pickBestVoice = (voices, langCode) => {
-  const target = (langCode || "de-DE").replace("_", "-");
-  const short = target.split("-")[0];
-
-  const candidates = voices
-    .filter(v => (v.lang || "").replace("_", "-").startsWith(short));
-
-  if (candidates.length === 0) return null;
-
-  const score = v => {
-    const name = (v.name || "").toLowerCase();
-    const lang = (v.lang || "").replace("_", "-");
-
-    let s = 0;
-
-    if (lang === target) s += 50;
-    if (lang.startsWith(short)) s += 10;
-
-    if (name.includes("google")) s += 40;
-    if (name.includes("siri")) s += 35;
-    if (name.includes("enhanced")) s += 30;
-    if (name.includes("premium")) s += 25;
-    if (name.includes("neural")) s += 25;
-    if (name.includes("natural")) s += 20;
-
-    if (v.localService === false) s += 10;
-
-    return s;
-  };
-
-  return candidates
-    .slice()
-    .sort((a, b) => score(b) - score(a))[0];
-};
-
-const speak = async (text, langCode = "de-DE") => {
+const speak = (text, langCode = 'de-DE') => {
   if (!text) return;
-  if (!("speechSynthesis" in window)) return;
+  if ('speechSynthesis' in window) {
+    const synth = window.speechSynthesis;
+    
+    // 1. 確保聲音列表已載入 (Chrome 有時需要這步)
+    let voices = synth.getVoices();
+    if (voices.length === 0) {
+        // 如果還沒載入，設個延遲重試一次，避免靜音
+        setTimeout(() => speak(text, langCode), 100);
+        return;
+    }
 
-  const synth = window.speechSynthesis;
-  const voices = await ensureVoicesReady();
+    synth.cancel(); // 停止上一句
 
-  synth.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = langCode;
+    utterance.rate = 0.9; // 語速 0.9 比較適合學習，覺得太慢可改成 1.0
 
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = langCode.replace("_", "-");
-  utterance.rate = 0.9;
+    // 2. 正規化語言代碼 (處理 mac 系統有時用底線 de_DE 的問題)
+    const targetLang = langCode.replace('_', '-');
+    const shortLang = targetLang.split('-')[0]; // e.g., 'de', 'en'
 
-  const best = pickBestVoice(voices, utterance.lang);
-  if (best) {
-    utterance.voice = best;
-    console.log(`Speaking with ${best.name} (${best.lang})`);
-  } else {
-    console.log("No matching voice found, using default voice");
+    // 3. 過濾出所有符合該語言的聲音
+    const availableVoices = voices.filter(v => v.lang.replace('_', '-').startsWith(shortLang));
+
+    // 4. 【關鍵選妃邏輯】優先順序：Google > Siri > Enhanced > Premium > 任何符合的
+    let selectedVoice = availableVoices.find(v => v.name.includes("Google") && v.lang.includes(shortLang)) // Chrome 首選
+                     || availableVoices.find(v => v.name.includes("Siri") && v.lang.includes(shortLang))   // Mac 首選 (聽起來最自然)
+                     || availableVoices.find(v => v.name.includes("Enhanced") && v.lang.includes(shortLang)) // Mac 次選 (增強版)
+                     || availableVoices.find(v => v.name.includes("Premium") && v.lang.includes(shortLang))  // 其他高級版
+                     || availableVoices.find(v => v.lang === targetLang) // 完全符合代碼
+                     || availableVoices[0]; // 沒魚蝦也好
+
+    if (selectedVoice) {
+        utterance.voice = selectedVoice;
+        // 打開 F12 Console 可以看到現在到底是用誰在講話，方便抓錯
+        console.log(`🔊 Speaking with: ${selectedVoice.name} (${selectedVoice.lang})`);
+    }
+
+    synth.speak(utterance);
   }
-
-  synth.speak(utterance);
 };
-
 
 const withRetry = async (fn, maxRetries = 3, delay = 1000) => {
     for (let i = 0; i < maxRetries; i++) {
