@@ -237,60 +237,53 @@ const shuffleArray = (array) => [...array].sort(() => Math.random() - 0.5);
 // --- 修改 speak 函式 ---
 // --- 修改 speak 函式 (高品質語音版) ---
 // --- 修改 speak 函式 (究極音質版) ---
+// --- 修改 speak 函式 (嚴格過濾版) ---
 const speak = (text, langCode = 'de-DE') => {
   if (!text) return;
   if ('speechSynthesis' in window) {
     const synth = window.speechSynthesis;
     
-    // 1. 確保聲音列表已載入 (Chrome 有時需要這步)
     let voices = synth.getVoices();
+    // 簡單的重試機制
     if (voices.length === 0) {
-        // 如果還沒載入，設個延遲重試一次，避免靜音
         setTimeout(() => speak(text, langCode), 100);
         return;
     }
 
-    synth.cancel(); // 停止上一句
+    synth.cancel();
 
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = langCode;
-    utterance.rate = 0.9; // 語速 0.9 比較適合學習，覺得太慢可改成 1.0
+    utterance.rate = 0.9;
 
-    // 2. 正規化語言代碼 (處理 mac 系統有時用底線 de_DE 的問題)
     const targetLang = langCode.replace('_', '-');
-    const shortLang = targetLang.split('-')[0]; // e.g., 'de', 'en'
+    const shortLang = targetLang.split('-')[0];
 
-    // 3. 過濾出所有符合該語言的聲音
-    const availableVoices = voices.filter(v => v.lang.replace('_', '-').startsWith(shortLang));
+    // 1. 先抓出所有該語言的聲音
+    const allLangVoices = voices.filter(v => v.lang.replace('_', '-').startsWith(shortLang));
 
-    // 4. 【關鍵選妃邏輯】優先順序：Enhanced > Premium > Google > Default (但排除 Compact/Low quality)
-    // 首先排除掉明確低品質的語音
-    const qualityVoices = availableVoices.filter(v => 
-        !v.name.includes("Compact") && 
-        !v.name.includes("(compact)") &&
-        !v.name.includes("low quality")
-    );
+    // 2. 【關鍵】建立「黑名單」過濾器
+    // 排除含有 "Compact", "Eloquence" (舊版), "Grandpa", "Grandma" 等通常音質較差的關鍵字
+    const BAD_VOICE_KEYWORDS = ["Compact", "Eloquence", "Zarvox", "Trinoids", "Whisper", "Bells", "Organ"];
     
-    let selectedVoice = 
-        // iOS 增強版最優先（品質最好）
-        qualityVoices.find(v => (v.name.includes("Enhanced") || v.name.includes("Premium")) && v.lang.includes(shortLang))
-        // Google 語音（Chrome 上通常不錯）
-        || qualityVoices.find(v => v.name.includes("Google") && v.lang.includes(shortLang))
-        // iOS Siri 語音（不帶 Compact 標籤的）
-        || qualityVoices.find(v => v.lang.includes(shortLang) && !v.name.includes("Compact"))
-        // 完全匹配語言代碼
-        || qualityVoices.find(v => v.lang === targetLang)
-        // 任何符合語言的（最後備選）
-        || qualityVoices[0]
-        || availableVoices[0]; // 真的沒有好的再退回任何可用的
+    const highQualityVoices = allLangVoices.filter(v => 
+        !BAD_VOICE_KEYWORDS.some(bad => v.name.includes(bad))
+    );
+
+    // 3. 決定候選池：如果有好聲音就用好聲音池，真的完全沒有才只好用爛聲音池
+    const candidateVoices = highQualityVoices.length > 0 ? highQualityVoices : allLangVoices;
+
+    // 4. 精英選拔 (Google > Siri > Premium > Enhanced > 完全符合 > 隨便一個)
+    let selectedVoice = candidateVoices.find(v => v.name.includes("Google")) 
+                     || candidateVoices.find(v => v.name.includes("Siri")) 
+                     || candidateVoices.find(v => v.name.includes("Premium"))
+                     || candidateVoices.find(v => v.name.includes("Enhanced"))
+                     || candidateVoices.find(v => v.lang === targetLang)
+                     || candidateVoices[0];
 
     if (selectedVoice) {
         utterance.voice = selectedVoice;
-        // 打開 F12 Console 可以看到現在到底是用誰在講話，方便抓錯
-        console.log(`🔊 Speaking with: ${selectedVoice.name} (${selectedVoice.lang})`);
-        console.log(`   Voice quality indicators: localService=${selectedVoice.localService}, default=${selectedVoice.default}`);
-    } else {
-        console.warn("⚠️ No suitable voice found for language:", langCode);
+        // console.log(`🔊 Speaking with: ${selectedVoice.name}`);
     }
 
     synth.speak(utterance);
