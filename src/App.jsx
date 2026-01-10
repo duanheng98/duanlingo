@@ -825,6 +825,9 @@ const SessionController = ({ vocabList, mode, onComplete, onUpdateItem, langCode
                 if (updatedCard.hellProgress.spelling >= 3 && updatedCard.hellProgress.listening >= 2) {
                     updatedCard.isNigate = false;
                     updatedCard.hellProgress = { spelling: 0, listening: 0 };
+
+                    updatedCard.cumulativeFailures = 0;
+                    
                     if (updatedCard.status > STATUS.LEARNING) {
                       updatedCard.status = STATUS.REVIEW;
                     }
