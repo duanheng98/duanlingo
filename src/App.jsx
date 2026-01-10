@@ -827,7 +827,7 @@ const SessionController = ({ vocabList, mode, onComplete, onUpdateItem, langCode
                     updatedCard.hellProgress = { spelling: 0, listening: 0 };
 
                     updatedCard.cumulativeFailures = 0;
-                    
+
                     if (updatedCard.status > STATUS.LEARNING) {
                       updatedCard.status = STATUS.REVIEW;
                     }
@@ -874,12 +874,14 @@ const SessionController = ({ vocabList, mode, onComplete, onUpdateItem, langCode
                }
             } else {
                 updatedCard.cumulativeFailures = (updatedCard.cumulativeFailures || 0) + 1;
+
+                if (updatedCard.cumulativeFailures >= 2 && !updatedCard.isNigate) {
+                  updatedCard.isNigate = true;
+                  updatedCard.successStreak = 0; // Reset streak on Nigate
+                }
             }
 
-            if (updatedCard.cumulativeFailures >= 2 && !updatedCard.isNigate) {
-                updatedCard.isNigate = true;
-                updatedCard.successStreak = 0; // Reset streak on Nigate
-            }
+            
 
             const isPromoted = checkPromotion(updatedCard);
             const isSessionMax = newAppearances >= SESSION_APPEARANCE_LIMIT;
