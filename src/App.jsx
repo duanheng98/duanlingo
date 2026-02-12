@@ -201,6 +201,23 @@ const DEFAULT_VOCAB_SETS = {
     { german: "Jíst", english: "to eat", gender: "v", example: "Jíme oběd." },
     { german: "Pít", english: "to drink", gender: "v", example: "Piju kávu." },
     { german: "Šťastný", english: "Happy", gender: "adj", example: "Jsem šťastný." }
+  ],
+  'Swedish': [
+    { german: "Hej", english: "Hello", gender: "phr", example: "Hej! Hur mår du?" },
+    { german: "Tack", english: "Thank you", gender: "phr", example: "Tack så mycket." },
+    { german: "Ja", english: "Yes", gender: "adv", example: "Ja, tack." },
+    { german: "Nej", english: "No", gender: "adv", example: "Nej, tack." },
+    { german: "Vatten", english: "Water", gender: "n", example: "Ett glas vatten, tack." },
+    { german: "Bröd", english: "Bread", gender: "n", example: "Brödet är färskt." },
+    { german: "Man", english: "Man", gender: "n", example: "Mannen är lång." },
+    { german: "Kvinna", english: "Woman", gender: "n", example: "Kvinnan läser." },
+    { german: "Kärlek", english: "Love", gender: "n", example: "Kärlek är viktigt." },
+    { german: "Hus", english: "House", gender: "n", example: "Huset är gammalt." },
+    { german: "Katt", english: "Cat", gender: "n", example: "Katten sover." },
+    { german: "Hund", english: "Dog", gender: "n", example: "Hunden skäller." },
+    { german: "Äta", english: "to eat", gender: "v", example: "Vi äter pizza." },
+    { german: "Dricka", english: "to drink", gender: "v", example: "Jag dricker kaffe." },
+    { german: "Glad", english: "Happy", gender: "adj", example: "Jag är glad." }
   ]
 };
 
@@ -2133,6 +2150,7 @@ const SUPPORTED_LANGUAGES = [
   { code: 'Russian', label: 'Russian (Русский)', flag: '🇷🇺', color: 'bg-red-600', speechCode: 'ru-RU' },
   { code: 'Polish', label: 'Polish (Polski)', flag: '🇵🇱', color: 'bg-rose-500', speechCode: 'pl-PL' },
   { code: 'Czech', label: 'Czech (Čeština)', flag: '🇨🇿', color: 'bg-blue-600', speechCode: 'cs-CZ' },
+  { code: 'Swedish', label: 'Swedish (Svenska)', flag: '🇸🇪', color: 'bg-blue-500', speechCode: 'sv-SE' }
 ];
 
 // --- NEW COMPONENT: Deck Library (The Menu Page) ---
