@@ -688,12 +688,17 @@ const SessionController = ({ vocabList, mode, onComplete, onUpdateItem, langCode
     } else if (mode === 'review') {
       const driftingPool = activeList.filter(i => i.status === STATUS.DRIFTING);
        
-      const withProgress = driftingPool.filter(i => 
-          (i.reviewProgress?.select > 0 || i.reviewProgress?.spelling > 0)
-      );
-      const noProgress = driftingPool.filter(i => 
-          (!i.reviewProgress?.select && !i.reviewProgress?.spelling)
-      );
+      const hasAnyReviewProgress = (rp) => {
+        if (!rp) return false;
+        return (rp.select || 0) > 0 ||
+          (rp.spelling || 0) > 0 ||
+          (rp.reverseSelect || 0) > 0 ||
+          (rp.sentence || 0) > 0;
+      };
+      
+      const withProgress = driftingPool.filter(i => hasAnyReviewProgress(i.reviewProgress));
+      const noProgress = driftingPool.filter(i => !hasAnyReviewProgress(i.reviewProgress));
+      
 
       if (withProgress.length >= 10) {
           candidates = shuffleArray(withProgress).slice(0, 10);
@@ -758,9 +763,9 @@ const SessionController = ({ vocabList, mode, onComplete, onUpdateItem, langCode
         const sentCount = p.sentence || 0;
       
         let tasks = [];
-        if (p.select < 2) tasks.push('select');
+        if (p.select < 1) tasks.push('select');
         if (p.spelling < 2) tasks.push('spelling');
-        if (revCount < 2) tasks.push('reverseSelect');
+        if (revCount < 1) tasks.push('reverseSelect');
         if (sentCount < 1) tasks.push('sentence');
 
         if (tasks.length > 0) return tasks[Math.floor(Math.random() * tasks.length)];
@@ -787,10 +792,10 @@ const SessionController = ({ vocabList, mode, onComplete, onUpdateItem, langCode
                  p.spelling >= PROMOTION_REQ.spelling;
       }
       if (mode === 'review') {
-          return card.reviewProgress.select >= 2 && 
-          card.reviewProgress.spelling >= 2 && 
-          (card.reviewProgress.reverseSelect || 0) >= 2 &&
-          (card.reviewProgress.sentence || 0) >= 1;
+        return (card.reviewProgress.select || 0) >= 1 &&
+        (card.reviewProgress.spelling || 0) >= 2 &&
+        (card.reviewProgress.reverseSelect || 0) >= 1 &&
+        (card.reviewProgress.sentence || 0) >= 1;
       }
       return false;
   };
