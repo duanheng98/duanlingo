@@ -2277,7 +2277,8 @@ const DeckLibrary = ({ decks, onSelectDeck, onAddDeck, onDeleteDeck, user, onLog
       {/* Create Modal (保持不變) */}
       {isCreating && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-6">
-          <div className="bg-white text-slate-800 p-6 rounded-3xl shadow-2xl w-full max-w-sm animate-in zoom-in">
+          <div className="bg-white text-slate-800 p-6 rounded-3xl shadow-2xl w-full max-w-sm animate-in zoom-in 
+                max-h-[90vh] overflow-y-auto">
             <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
                 <div className="bg-indigo-100 p-2 rounded-lg"><Plus className="w-5 h-5 text-indigo-600" /></div>
                 New Language Deck
