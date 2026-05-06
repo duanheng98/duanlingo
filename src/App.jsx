@@ -2346,6 +2346,7 @@ const App = () => {
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isVideoDone, setIsVideoDone] = useState(false);
+  const [cloudLoaded, setCloudLoaded] = useState(false);
 
   // [Ref] Back up current Decks state for anonymous data migration upon login
   const decksRef = useRef(decks); 
@@ -2373,52 +2374,55 @@ const App = () => {
   // [Logic] Checks if v8 (new) data is empty. If so, forces a check for v7 (old) data to auto-migrate.
   // 2. Core Data Sync & Migration Logic (Smart Auto-Restore)
   
-  // 2. Core Data Sync (Clean Version - No Migration)
-  useEffect(() => {
-    if (!authReady || !db || !user) return;
-    setLoading(true);
-    
-    // 使用新的路徑
-    const docRef = doc(db, 'users', user.uid, 'data', 'vocab_multilingua_v1');
-    
-    const unsubscribe = onSnapshot(docRef, async (docSnap) => {
+// 2. Core Data Sync
+useEffect(() => {
+  if (!authReady || !db || !user) return;
+
+  setLoading(true);
+  setCloudLoaded(false);
+
+  const docRef = doc(db, 'users', user.uid, 'data', STORAGE_KEY);
+
+  const unsubscribe = onSnapshot(
+    docRef,
+    (docSnap) => {
       if (docSnap.exists()) {
-        // --- CASE A: 載入現有資料 (Load Existing) ---
         console.log("Loading Cloud Data...");
         const data = docSnap.data();
-        
-        // 簡單的防呆：確認資料格式大致正確
-        if (data && data.decks) {
-             setDecks(data.decks);
-             // 如果找不到 currentDeckId，就預設用第一個 deck
-             const firstDeckId = Object.keys(data.decks)[0];
-             setCurrentDeckId(data.currentDeckId || firstDeckId);
-        }
-        setLoading(false);
 
+        const cloudDecks = data?.decks && typeof data.decks === 'object'
+          ? data.decks
+          : {};
+
+        setDecks(cloudDecks);
+
+        const firstDeckId = Object.keys(cloudDecks)[0] || null;
+        const safeCurrentDeckId =
+          data?.currentDeckId && cloudDecks[data.currentDeckId]
+            ? data.currentDeckId
+            : firstDeckId;
+
+        setCurrentDeckId(safeCurrentDeckId);
       } else {
-        // --- CASE B: 全新用戶初始化 (Fresh Start) ---
-        // 這裡完全不管舊資料，直接給他一套全新的德語牌組
-        console.log("No data found. Initializing new user...");
-        
-        // const initDeckId = 'german_core';
-        const initDecks = {};
+        console.log("No cloud data found. Keeping local state empty, but NOT writing empty data.");
 
-        // 直接寫入資料庫
-        await setDoc(docRef, { 
-          decks: initDecks, 
-          currentDeckId: null,
-          lastUpdated: new Date().toISOString() 
-        });
-        
-        // 設定本地 State
-        setDecks(initDecks);
+        setDecks({});
         setCurrentDeckId(null);
-        setLoading(false);
       }
-    });
-    return () => unsubscribe();
-  }, [authReady, db, user]);
+
+      setCloudLoaded(true);
+      setLoading(false);
+    },
+    (error) => {
+      console.error("Cloud load error:", error);
+      alert("Failed to load cloud data: " + error.message);
+      setCloudLoaded(true);
+      setLoading(false);
+    }
+  );
+
+  return () => unsubscribe();
+}, [authReady, db, user]);
 
   // --- 新增：遺忘曲線檢查 (Strict Time Decay) ---
   useEffect(() => {
@@ -2500,22 +2504,39 @@ const App = () => {
   }, [currentDeckId]); // 切換牌組時執行檢查
 
   // 3. Save Function
-  const saveToCloud = async (newDecks, activeId) => {
+  // 3. Save Function
+  const saveToCloud = async (newDecks, activeId, options = {}) => {
     if (!db || !user) return;
+
+    if (!cloudLoaded) {
+    console.warn("Blocked save before cloud data finished loading.");
+    return;
+    }
+
+    const safeDecks = newDecks && typeof newDecks === 'object' ? newDecks : {};
+    const isEmptyDecks = Object.keys(safeDecks).length === 0;
+
+    if (isEmptyDecks && !options.allowEmpty) {
+      console.error("Blocked dangerous empty save.");
+      alert("Blocked an unsafe empty save. Cloud data was not overwritten.");
+      return;
+    }
+
     setIsSaving(true);
+
     try {
-      // 確保這裡的路徑跟上面 useEffect 的路徑一模一樣！
-      const docRef = doc(db, 'users', user.uid, 'data', 'vocab_multilingua_v1');
-      
-      await setDoc(docRef, { 
-          decks: newDecks, 
-          currentDeckId: activeId || currentDeckId,
-          lastUpdated: new Date().toISOString() 
-      });
-    } catch (e) { 
-        console.error("Save Error:", e);
+      const docRef = doc(db, 'users', user.uid, 'data', STORAGE_KEY);
+
+      await setDoc(docRef, {
+        decks: safeDecks,
+        currentDeckId: activeId ?? currentDeckId ?? null,
+        lastUpdated: new Date().toISOString()
+      }, { merge: true });
+    } catch (e) {
+      console.error("Save Error:", e);
+      alert("Save failed: " + e.message);
     } finally {
-        setTimeout(() => setIsSaving(false), 500);
+      setTimeout(() => setIsSaving(false), 500);
     }
   };
 
@@ -2657,7 +2678,7 @@ const App = () => {
         delete newDecks[deckId];
         
         // 存檔 (如果 nextActiveId 是 null，就存 null，這樣下次進來就不會亂選)
-        saveToCloud(newDecks, nextActiveId);
+        saveToCloud(newDecks, nextActiveId, { allowEmpty: true });
         
         return newDecks;
     });
@@ -2670,10 +2691,22 @@ const App = () => {
     }
   };
 
-  const handleSelectDeck = (deckId) => {
+  const handleSelectDeck = async (deckId) => {
     setCurrentDeckId(deckId);
-    saveToCloud(decks, deckId);
-    setView('home'); // 選完牌組後，進入 Dashboard
+    setView('home');
+  
+    if (!db || !user || !cloudLoaded) return;
+  
+    try {
+      const docRef = doc(db, 'users', user.uid, 'data', STORAGE_KEY);
+  
+      await setDoc(docRef, {
+        currentDeckId: deckId,
+        lastUpdated: new Date().toISOString()
+      }, { merge: true });
+    } catch (e) {
+      console.error("Failed to update current deck:", e);
+    }
   };
 
   const handleHardReset = async () => {
