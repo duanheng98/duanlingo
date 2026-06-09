@@ -2324,73 +2324,7 @@ const DeckLibrary = ({ decks, onSelectDeck, onAddDeck, onDeleteDeck, user, onLog
   );
 };
 
-const applyTimeDecay = useCallback(() => {
-  if (!currentDeckId || !currentDeck || !currentDeck.words || currentDeck.words.length === 0) return;
 
-  const ONE_DAY = 10 *1000 //24 * 60 * 60 * 1000;
-  const now = Date.now();
-  let hasChanges = false;
-
-  const updatedWords = currentDeck.words.map(item => {
-    if (item.isDeleted || item.isNigate) return item;
-
-    let newItem = { ...item };
-    const lastTouch = newItem.lastReviewed || newItem.lastInteraction || 0;
-    const timeDiff = now - lastTouch;
-
-    if (newItem.status === STATUS.REVIEW && timeDiff > ONE_DAY) {
-      newItem = {
-        ...newItem,
-        status: STATUS.DRIFTING,
-        reviewProgress: { spelling: 0, select: 0, reverseSelect: 0, sentence: 0 }
-      };
-      hasChanges = true;
-    }
-
-    if (newItem.status === STATUS.MASTERED && timeDiff > ONE_DAY * 5) {
-      newItem = {
-        ...newItem,
-        status: STATUS.DRIFTING,
-        successStreak: 0,
-        reviewProgress: { spelling: 0, select: 0, reverseSelect: 0, sentence: 0 }
-      };
-      hasChanges = true;
-    }
-
-    if (newItem.status === STATUS.DRIFTING) {
-      const hasProgress =
-        (newItem.reviewProgress?.select || 0) > 0 ||
-        (newItem.reviewProgress?.spelling || 0) > 0 ||
-        (newItem.reviewProgress?.reverseSelect || 0) > 0 ||
-        (newItem.reviewProgress?.sentence || 0) > 0;
-
-      const lastInteraction = newItem.lastInteraction || now;
-
-      if (hasProgress && now - lastInteraction > ONE_DAY) {
-        newItem = {
-          ...newItem,
-          reviewProgress: { spelling: 0, select: 0, reverseSelect: 0, sentence: 0 }
-        };
-        hasChanges = true;
-      }
-    }
-
-    return newItem;
-  });
-
-  if (!hasChanges) return;
-
-  const newDecks = {
-    ...decks,
-    [currentDeckId]: {
-      ...currentDeck,
-      words: updatedWords
-    }
-  };
-
-  setDecks(newDecks);
-  saveToCloud(newDecks, currentDeckId);
-}, [currentDeckId, currentDeck, decks, saveToCloud]);
 
 // --- APP ROOT (COMPLETE REWRITE) ---
 // --- APP ROOT (COMPLETE REWRITE) ---
@@ -2493,10 +2427,6 @@ useEffect(() => {
 }, [authReady, db, user]);
 
   // --- 新增：遺忘曲線檢查 (Strict Time Decay) ---
-  useEffect(() => {
-    if (!cloudLoaded) return;
-    applyTimeDecay();
-  }, [cloudLoaded, currentDeckId, currentDeck?.words, applyTimeDecay]);
 
   // 3. Save Function
   // 3. Save Function
@@ -2534,6 +2464,75 @@ useEffect(() => {
       setTimeout(() => setIsSaving(false), 500);
     }
   };
+  // --- Time decay: move REVIEW / MASTERED words into DRIFTING after enough time ---
+  useEffect(() => {
+  if (!cloudLoaded || !currentDeckId || !currentDeck?.words?.length) return;
+
+  // For testing, keep this at 10 seconds. Change back to 24 * 60 * 60 * 1000 for production.
+  const ONE_DAY = 10 * 1000;
+  const now = Date.now();
+  let hasChanges = false;
+
+  const updatedWords = currentDeck.words.map(item => {
+    if (item.isDeleted || item.isNigate) return item;
+
+    let newItem = { ...item };
+    const lastTouch = newItem.lastReviewed || newItem.lastInteraction || 0;
+    const timeDiff = now - lastTouch;
+
+    if (newItem.status === STATUS.REVIEW && timeDiff > ONE_DAY) {
+      newItem = {
+        ...newItem,
+        status: STATUS.DRIFTING,
+        reviewProgress: { spelling: 0, select: 0, reverseSelect: 0, sentence: 0 }
+      };
+      hasChanges = true;
+    }
+
+    if (newItem.status === STATUS.MASTERED && timeDiff > ONE_DAY * 5) {
+      newItem = {
+        ...newItem,
+        status: STATUS.DRIFTING,
+        successStreak: 0,
+        reviewProgress: { spelling: 0, select: 0, reverseSelect: 0, sentence: 0 }
+      };
+      hasChanges = true;
+    }
+
+    if (newItem.status === STATUS.DRIFTING) {
+      const hasProgress =
+        (newItem.reviewProgress?.select || 0) > 0 ||
+        (newItem.reviewProgress?.spelling || 0) > 0 ||
+        (newItem.reviewProgress?.reverseSelect || 0) > 0 ||
+        (newItem.reviewProgress?.sentence || 0) > 0;
+
+      const lastInteraction = newItem.lastInteraction || now;
+
+      if (hasProgress && now - lastInteraction > ONE_DAY) {
+        newItem = {
+          ...newItem,
+          reviewProgress: { spelling: 0, select: 0, reverseSelect: 0, sentence: 0 }
+        };
+        hasChanges = true;
+      }
+    }
+
+    return newItem;
+  });
+
+  if (!hasChanges) return;
+
+  const newDecks = {
+    ...decks,
+    [currentDeckId]: {
+      ...currentDeck,
+      words: updatedWords
+    }
+  };
+
+  setDecks(newDecks);
+  saveToCloud(newDecks, currentDeckId);
+  }, [cloudLoaded, currentDeckId, currentDeck, decks]);
 
   const handleGoogleLogin = async () => {
     const auth = getAuth();
