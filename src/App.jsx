@@ -2469,7 +2469,7 @@ useEffect(() => {
   if (!cloudLoaded || !currentDeckId || !currentDeck?.words?.length) return;
 
   // For testing, keep this at 10 seconds. Change back to 24 * 60 * 60 * 1000 for production.
-  const ONE_DAY = 10 * 1000;
+  const ONE_DAY = 24 * 60 * 60 * 1000;
   const now = Date.now();
   let hasChanges = false;
 
