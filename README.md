@@ -1,16 +1,27 @@
-# React + Vite
+# DuanLingo
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+以 React、Firebase、Tailwind CSS 和 Vite 製作的單字學習 app。
 
-Currently, two official plugins are available:
+## 開發環境
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- Node.js 24.11.x（`.nvmrc` 建議版本；亦支援 Node 22.13+ LTS）
+- npm 11.6.x
 
-## React Compiler
+若使用 nvm，可執行 `nvm use` 讀取專案的 `.nvmrc`。
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## 指令
 
-## Expanding the ESLint configuration
+```bash
+npm ci
+npm run dev
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+- `npm run build`：建立 production bundle
+- `npm run preview`：預覽 production bundle
+- `npm run lint`：執行 ESLint
+- `npm test`：以 Vitest 執行一次測試
+- `npm run test:watch`：監看檔案並持續執行測試
+
+測試環境使用 jsdom、React Testing Library 與 `@testing-library/jest-dom`；共用初始化位於 `vitest.setup.js`。
+
+Tailwind CSS 由 `@tailwindcss/vite` 在 build 階段產生，不依賴瀏覽器端 CDN。
